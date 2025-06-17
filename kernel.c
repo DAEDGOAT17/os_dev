@@ -9,6 +9,6 @@ void puts(const char* str) {
 }
 
 void kmain(void) {
-  puts("Hello, World!");
+  puts("Hello, World!  pankaj");
   while (1);
 }
