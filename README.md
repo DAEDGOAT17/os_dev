@@ -1,49 +1,74 @@
-# Jarvis OS 🌌
+# Jarvis OS
 
-A custom, 32-bit x86 monolithic kernel built from scratch.
+A custom 32-bit x86 monolithic kernel built from scratch.
 
-Jarvis OS is a "Higher-Half" kernel designed to explore core operating system concepts including manual memory management, interrupt-driven I/O, and hardware abstraction.
+Jarvis OS is a "Higher-Half" kernel designed to explore core operating system concepts, including manual memory management, interrupt-driven I/O, and hardware abstraction.
 
 ---
 
 ## 🚀 Key Features
 
-- **Bootloader**: Multiboot-compliant (GRUB) loading mechanism.
+- **Bootloader**: Multiboot-compliant GRUB loading mechanism
 - **Memory Management**:
-  - **PMM**: Physical Memory Manager using a Bitset (Managing ~128MB RAM).
-  - **VMM**: Virtual Memory Manager with 2-level Paging (Page Directories & Tables).
-- **Interrupts**: Custom IDT (Interrupt Descriptor Table) with PIC remapping for hardware IRQs.
+  - **PMM**: Physical Memory Manager using bitmap allocation (~128MB RAM)
+  - **VMM**: Virtual Memory Manager with 2-level paging (page directories and tables)
+- **Interrupts**: Custom IDT with PIC remapping for hardware IRQs
 - **Drivers**:
-  - **VGA**: Text-mode driver at `0xB8000` with hardware cursor control and scrolling.
-  - **Keyboard**: Full US-QWERTY driver with Shift/Caps Lock state tracking.
-- **Interface**: An interactive command-line shell with a command buffer.
+  - **VGA**: Text-mode driver with hardware cursor control and scrolling
+  - **Keyboard**: US-QWERTY driver with Shift and Caps Lock support
+- **Shell**: Interactive command-line interface with command buffer
 
 ---
 
 ## 📂 Project Structure
 
-```text
+```
 .
 ├── src/
 │   ├── arch/i386/    # GDT, IDT, PIC, and I/O logic
-│   ├── asm/          # Assembly entry points (loader, interrupts, paging)
-│   ├── drivers/      # Hardware drivers (Keyboard, VGA)
-│   └── kernel/       # Core logic (PMM, VMM, Shell, String lib)
-├── include/          # Header files (.h)
-├── build/            # Compiled object files (Git ignored)
-├── iso/              # GRUB configuration and boot files
-├── link.ld           # Linker script defining memory layout
-└── run.sh            # Automated build and emulation script
+│   ├── asm/          # Assembly entry points
+│   ├── drivers/      # Keyboard and VGA drivers
+│   └── kernel/       # Core functionality (PMM, VMM, shell)
+├── include/          # Header files
+├── build/            # Compiled objects (ignored)
+├── iso/              # GRUB configuration
+├── link.ld           # Linker script
+└── run.sh            # Build and emulation script
 ```
 
-🛠️ Build & RunPrerequisitesYou need a Linux environment with the following tools installed:gcc & binutils (32-bit support)nasm (Assembly compiler)grub-mkrescue & xorriso (For ISO generation)qemu-system-i386 (For emulation)ExecutionUse the provided run.sh script to compile the source and launch the OS in QEMU:Bashchmod +x run.sh
+## Getting Started
 
-```
+**Prerequisites:**
+
+- Linux environment with gcc, binutils (32-bit), nasm, grub-mkrescue, xorriso, and qemu-system-i386
+
+**Build and Run:**
+
+```bash
+chmod +x run.sh
 ./run.sh
 ```
 
-## Architecture Overview1. Memory LayoutJarvis OS uses Paging to separate physical memory from virtual addresses. The kernel is designed to be mapped into the "Higher Half" ($0xC0000000$), leaving the lower memory range free for future user-space applications.2. The Interrupt ChainThe kernel handles hardware interaction via a structured interrupt pipeline:Hardware (e.g., Keyboard) triggers an IRQ signal.PIC (Programmable Interrupt Controller) routes the signal to the CPU.IDT looks up the correct assembly stub in interrupts.s.Assembly Stub saves registers and calls the C-based keyboard_handler.Driver processes the scancode and updates the VGA buffer.📝 Roadmap & Progress[x] Global Descriptor Table (GDT)[x] Interrupt Descriptor Table (IDT) & PIC Remapping[x] Physical Memory Manager (Bitmap)[x] Virtual Memory Manager (Paging)[x] Interactive Keyboard & Screen Drivers[x] Basic Command Shell[ ] Heap Allocator (kmalloc)[ ] Multitasking (Task Switching)[ ] System Calls (Software Interrupts)🛡️ LicenseThis project is open-source. Feel free to use it for educational purposes.
+## Architecture
 
-### Suggested Next Step
+**Memory Layout**: Kernel mapped to the higher half (0xC0000000) with lower memory reserved for user space.
 
-Now that your documentation is ready, would you like to implement the **`mem`** command for your shell? It would use your PMM functions to show the user exactly how much RAM is free versus occupied in a nice table.
+**Interrupt Pipeline**: Hardware IRQs → PIC routing → IDT lookup → assembly stub → C handler → driver response.
+
+## Roadmap
+
+- [x] Global Descriptor Table
+- [x] Interrupt Descriptor Table & PIC
+- [x] Physical Memory Manager
+- [x] Virtual Memory Manager
+- [x] Keyboard and VGA drivers
+- [x] Shell
+- [ ] Heap allocator
+- [ ] Multitasking
+- [ ] System calls
+
+---
+
+## License
+
+Open-source for educational use.
