@@ -1,7 +1,6 @@
 #include "screen.h"
 #include "io.h"
 
-// Define the cursor globally so the linker can find it
 int cursor = 0;
 
 void update_cursor() {
@@ -45,4 +44,18 @@ void print_string(char* str) {
     for (int i = 0; str[i] != '\0'; i++) {
         print_char(str[i]);
     }
+}
+
+void kprint_hex(uint32_t n) {
+    char* chars = "0123456789ABCDEF";
+    char buffer[11];
+    buffer[0] = '0';
+    buffer[1] = 'x';
+    buffer[10] = '\0';
+
+    for (int i = 0; i < 8; i++) {
+        buffer[9 - i] = chars[n & 0xF];
+        n >>= 4;
+    }
+    print_string(buffer);
 }

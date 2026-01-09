@@ -41,5 +41,6 @@ idt_load:
 
 section .bss
 align 16
-stack_bottom: resb 16384
-stack_top:
+stack_bottom: 
+    resb 16384 ; 16 KB
+stack_top:     ; ESP points here (grows downwards)

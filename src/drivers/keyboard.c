@@ -1,4 +1,5 @@
 #include "io.h"
+#include "shell.h"
 #include "screen.h"
 #include <stdint.h>
 #include <stdbool.h>
@@ -34,8 +35,12 @@ void keyboard_handler() {
         } else {
             char c = shift_pressed ? kbd_us_shift[scancode] : kbd_us[scancode];
             if (caps_lock && c >= 'a' && c <= 'z') c -= 32;
-            if (c > 0) print_char(c);
+            if (c > 0) shell_input(c);
         }
     }
+    // Inside keyboard_handler()
+
+    
     outb(0x20, 0x20);
 }
+

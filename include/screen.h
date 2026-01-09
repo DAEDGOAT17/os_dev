@@ -7,5 +7,8 @@ void clear_screen();
 void print_char(char c);
 void print_string(char* str);
 void update_cursor();
+void kprint_hex(uint32_t n);
+extern int cursor; 
+void scroll();     
 
 #endif
