@@ -20,4 +20,4 @@ ld -m elf_i386 -T link.ld -o kernel.elf build/loader.o build/io.o build/screen.o
 
 echo "Build complete. Running Jarvis..."
 # Added -d int to help you see if a fault occurs
-qemu-system-i386 -kernel kernel.elf -d int -no-reboot
+qemu-system-i386 -kernel kernel.elf
