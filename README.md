@@ -6,7 +6,7 @@ Jarvis OS is a "Higher-Half" kernel designed to explore core operating system co
 
 ---
 
-## 🚀 Key Features
+##  Key Features
 
 - **Bootloader**: Multiboot-compliant GRUB loading mechanism
 - **Memory Management**:
