@@ -1,0 +1,29 @@
+# --- Build Artifacts ---
+# Ignore all object files and dependency files
+build/*.o
+build/*.d
+
+# Ignore the final linked kernel ELF
+kernel.elf
+iso/boot/kernel.elf
+
+# --- Disk Images & ISOs ---
+# Ignore the final bootable media
+*.iso
+*.bin
+*.img
+
+# --- Emulator & Debugging ---
+# If you use QEMU and it generates log files
+qemu-vgalog.txt
+serial.log
+
+# --- IDE & System Files ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# --- Temporary Files ---
+*.tmp
