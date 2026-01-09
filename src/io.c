@@ -11,5 +11,5 @@ void outb(unsigned short port, unsigned char val) {
 }
 
 void wait_io() {
-    outb(0x80, 0); // Writing to an unused port to create a small delay
+    outb(0x80, 0); 
 }
