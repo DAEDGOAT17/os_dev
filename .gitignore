@@ -1,0 +1,23 @@
+# ===============================
+# Build & Generated Files
+# ===============================
+build/
+*.o
+*.elf
+*.bin
+*.iso
+*.img
+*.map
+# Ignore all text files
+*.txt
+# ignore logs
+*.log
+
+# Editor / IDE Files
+# ===============================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.bak
