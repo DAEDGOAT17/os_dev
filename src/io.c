@@ -1,0 +1,15 @@
+#include "io.h"
+
+unsigned char inb(unsigned short port) {
+    unsigned char ret;
+    asm volatile ("inb %1, %0" : "=a"(ret) : "Nd"(port));
+    return ret;
+}
+
+void outb(unsigned short port, unsigned char val) {
+    asm volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
+}
+
+void wait_io() {
+    outb(0x80, 0); // Writing to an unused port to create a small delay
+}

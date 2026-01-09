@@ -1,11 +1,19 @@
 ENTRY(loader)
+OUTPUT_FORMAT(elf32-i386)
 
-SECTIONS
-{
-    . = 1M;
+SECTIONS {
+    . = 0x100000; /* 1MB mark */
 
-    .text : { *(.text) }
+    .text : {
+        *(.multiboot_header)
+        *(.text)
+    }
+
     .rodata : { *(.rodata) }
     .data : { *(.data) }
-    .bss : { *(.bss) }
+    
+    .bss : {
+        *(COMMON)
+        *(.bss)
+    }
 }
