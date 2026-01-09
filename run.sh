@@ -14,9 +14,21 @@ gcc -m32 -c src/screen.c -o build/screen.o -Iinclude -ffreestanding -O2
 gcc -m32 -c src/idt.c -o build/idt.o -Iinclude -ffreestanding -O2
 gcc -m32 -c src/keyboard.c -o build/keyboard.o -Iinclude -ffreestanding -O2
 gcc -m32 -c src/kernel.c -o build/kernel.o -Iinclude -ffreestanding -O2
+gcc -m32 -c src/shell.c -o build/shell.o -Iinclude -ffreestanding -O2
+gcc -m32 -c src/string.c -o build/string.o -Iinclude -ffreestanding -O2
 
 # Link: Force loader.o to be FIRST to ensure Multiboot header is found
-ld -m elf_i386 -T link.ld -o kernel.elf build/loader.o build/io.o build/screen.o build/idt.o build/keyboard.o build/interrupts.o build/kernel.o
+ld -m elf_i386 -T link.ld -o kernel.elf \
+build/loader.o \
+build/io.o \
+build/screen.o \
+build/idt.o \
+build/keyboard.o \
+build/interrupts.o \
+build/kernel.o \
+build/shell.o \
+build/string.o
+
 
 echo "Build complete. Running Jarvis..."
 # Added -d int to help you see if a fault occurs

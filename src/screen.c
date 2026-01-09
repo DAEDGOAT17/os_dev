@@ -46,3 +46,16 @@ void print_string(char* str) {
         print_char(str[i]);
     }
 }
+void backspace() {
+    if (cursor == 0)
+        return;
+
+    cursor--;
+
+    char *vga = (char*)0xB8000;
+    vga[cursor * 2] = ' ';
+    vga[cursor * 2 + 1] = 0x07;
+
+    update_cursor();
+}
+
