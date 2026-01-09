@@ -5,7 +5,7 @@
 
 void clear_screen();
 void print_char(char c);
-void print_string(char* str);
+void print_string(const char* str);
 void update_cursor();
 void backspace(void);
 void print_char(char c);

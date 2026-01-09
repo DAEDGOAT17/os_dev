@@ -41,7 +41,7 @@ void print_char(char c) {
     update_cursor();
 }
 
-void print_string(char* str) {
+void print_string(const char* str) {
     for (int i = 0; str[i] != '\0'; i++) {
         print_char(str[i]);
     }
