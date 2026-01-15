@@ -30,3 +30,4 @@ serial.log
 
 # --- text files (local development files) ---
 *.txt
+.clangd
