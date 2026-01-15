@@ -1,4 +1,5 @@
 #include "vmm.h"
+#include "pmm.h"
 #include <stdint.h>
 
 // The Page Directory (1024 entries, 4KB aligned)
@@ -32,4 +33,33 @@ void vmm_init() {
     // 4. Hand the Directory to the CPU and Enable Paging
     vmm_load_page_directory(page_directory);
     vmm_enable_paging();
+}
+
+void vmm_map_page(uint32_t virtual_addr, uint32_t physical_addr) {
+    uint32_t pd_index = virtual_addr >> 22;  // Top 10 bits
+    uint32_t pt_index = (virtual_addr >> 12) & 0x3FF;  // Next 10 bits
+    
+    // Check if page table exists for this directory entry
+    if (!(page_directory[pd_index] & VMM_PRESENT)) {
+        // Allocate new page table
+        uint32_t* new_table = (uint32_t*)pmm_alloc_block();
+        if (!new_table) return;  // Out of memory
+        
+        // Clear the new table
+        for (int i = 0; i < 1024; i++) {
+            new_table[i] = 0;
+        }
+        
+        // Add to directory
+        page_directory[pd_index] = ((uint32_t)new_table) | (VMM_PRESENT | VMM_WRITABLE);
+    }
+    
+    // Get the page table
+    uint32_t* page_table = (uint32_t*)(page_directory[pd_index] & 0xFFFFF000);
+    
+    // Map the page
+    page_table[pt_index] = physical_addr | (VMM_PRESENT | VMM_WRITABLE);
+    
+    // Flush TLB for this address
+    asm volatile("invlpg (%0)" : : "r"(virtual_addr) : "memory");
 }
