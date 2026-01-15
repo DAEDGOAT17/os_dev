@@ -72,7 +72,7 @@ void task_list() {
     
     for (int i = 0; i < MAX_TASKS; i++) {
         if (tasks[i].state != TASK_DEAD) {
-            kprint_hex(tasks[i].id);
+            kprint_dec(tasks[i].id);
             print_string("  ");
             
             switch (tasks[i].state) {

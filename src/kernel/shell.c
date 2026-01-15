@@ -80,11 +80,11 @@ void shell_execute(char* cmd) {
         uint32_t h, m, s;
         timer_get_uptime(&h, &m, &s);
         print_string("Uptime: ");
-        kprint_hex(h);
+        kprint_dec(h);
         print_string("h ");
-        kprint_hex(m);
+        kprint_dec(m);
         print_string("m ");
-        kprint_hex(s);
+        kprint_dec(s);
         print_string("s\n");
     } else if (cmd[0] != '\0') {
         print_string("Unknown command: ");

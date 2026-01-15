@@ -59,3 +59,20 @@ void kprint_hex(uint32_t n) {
     }
     print_string(buffer);
 }
+void kprint_dec(uint32_t num) {
+    char buf[12];
+    int i = 0;
+
+    if (num == 0) {
+        print_char('0');
+        return;
+    }
+
+    while (num > 0) {
+        buf[i++] = '0' + (num % 10);
+        num /= 10;
+    }
+
+    while (i--)
+        print_char(buf[i]);
+}
