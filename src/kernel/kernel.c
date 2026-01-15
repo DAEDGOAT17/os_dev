@@ -3,15 +3,17 @@
 #include "gdt.h"
 #include "idt.h"
 #include "screen.h"
-#include "kmalloc.h"  // ADD THIS
+#include "kmalloc.h" 
+#include "task.h"
 
 void kmain(multiboot_info_t* mbd, uint32_t magic) {
     // Initialize core systems
     init_gdt();
     init_idt();
+    task_init();
     pmm_init(mbd);
     vmm_init();
-    kmalloc_init();  // ADD THIS - Initialize heap allocator
+    kmalloc_init();  
     
     // Clear screen and show welcome message
     clear_screen();

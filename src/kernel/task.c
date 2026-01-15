@@ -2,7 +2,7 @@
 #include "kmalloc.h"
 #include "screen.h"
 #include "timer.h"
-#include "string.h"
+
 
 static task_t tasks[MAX_TASKS];
 static uint32_t next_task_id = 0;

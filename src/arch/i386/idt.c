@@ -1,6 +1,5 @@
 #include "idt.h"
 #include "io.h"
-#include "screen.h"
 #include "timer.h"
 
 struct idt_entry idt[256];
