@@ -10,19 +10,20 @@
 char shell_buffer[256];
 int buffer_idx = 0;
 
-// Helper function to compare command with argument
+// Helper function to compare command with argument for shell
 bool cmd_starts_with(const char* cmd, const char* prefix) {
     int i = 0;
     while (prefix[i] && cmd[i] == prefix[i]) i++;
     return prefix[i] == '\0';
 }
-
+//shell execute function
 void shell_execute(char* cmd) {
     if (strcmp(cmd, "help") == 0) {
         print_string("Available Commands:\n");
         print_string("  help       - Show this message\n");
         print_string("  clear      - Clear screen\n");
-        print_string("  mem        - Show memory info\n");
+        print_string("  mem        - Show system memory status\n");
+        print_string("  heap       - Show kernel heap usage\n");
         print_string("  echo <msg> - Print message\n");
         print_string("  version    - Show OS version\n");
         print_string("  ps         - Show process list\n");
@@ -33,10 +34,12 @@ void shell_execute(char* cmd) {
         clear_screen();
         
     } else if (strcmp(cmd, "mem") == 0) {
-        print_string("Memory Manager Status:\n");
-        print_string("  PMM: Active (128MB managed)\n");
-        print_string("  VMM: Active (4MB identity mapped)\n");
-        print_string("  Block Size: 4096 bytes\n");
+        print_string("Memory Status\n");
+        print_string("-------------\n");
+        print_string("Physical Memory : 128 MB\n");      // from multiboot later
+        print_string("Paging          : Enabled\n");
+        print_string("Page Size       : 4096 bytes\n");
+        print_string("Kernel Heap     : Active\n");
         
     } else if (cmd_starts_with(cmd, "echo ")) {
         // Print everything after "echo "
@@ -60,19 +63,23 @@ void shell_execute(char* cmd) {
         outb(0x64, 0xFE);
         asm volatile("hlt");
         
-    } else if (strcmp(cmd, "mem") == 0) {
+    } else if (strcmp(cmd, "heap") == 0) {
         heap_stats_t stats;
         kmalloc_get_stats(&stats);
-        print_string("Memory Manager Status:\n");
-        print_string("  PMM: Active (128MB managed)\n");
-        print_string("  VMM: Active (paging enabled)\n");
-        print_string("\nHeap Statistics:\n");
-        print_string("  Total: ");
-        kprint_hex(stats.total_size);
-        print_string(" bytes\n  Used: ");
-        kprint_hex(stats.used_size);
-        print_string(" bytes\n  Free: ");
-        kprint_hex(stats.free_size);
+
+        print_string("Kernel Heap\n");
+        print_string("-----------\n");
+
+        print_string("Total : ");
+        kprint_dec(stats.total_size);
+        print_string(" bytes\n");
+
+        print_string("Used  : ");
+        kprint_dec(stats.used_size);
+        print_string(" bytes\n");
+
+        print_string("Free  : ");
+        kprint_dec(stats.free_size);
         print_string(" bytes\n");
     } else if (strcmp(cmd, "ps") == 0) {
         task_list();
@@ -93,6 +100,7 @@ void shell_execute(char* cmd) {
     }
 }
 
+//shell input function
 void shell_input(char c) {
     if (c == '\n') {
         shell_buffer[buffer_idx] = '\0';
@@ -112,5 +120,16 @@ void shell_input(char c) {
     } else if (buffer_idx < 255 && c >= ' ') {
         shell_buffer[buffer_idx++] = c;
         print_char(c);
+    }
+}
+
+//shell task function
+void shell_task(void) {
+    print_string("> ");
+
+    while (1) {
+        // Shell runs passively
+        // Keyboard IRQ feeds shell_input()
+        task_sleep(1);
     }
 }

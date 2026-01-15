@@ -5,16 +5,19 @@
 #include "screen.h"
 #include "kmalloc.h" 
 #include "task.h"
+#include "shell.h"
 
 void kmain(multiboot_info_t* mbd, uint32_t magic) {
     // Initialize core systems
     init_gdt();
     init_idt();
-    task_init();
     pmm_init(mbd);
     vmm_init();
     kmalloc_init();  
-    
+    task_init();
+    task_create("shell", shell_task, 1);
+    asm volatile("sti");
+
     // Clear screen and show welcome message
     clear_screen();
     print_string("=================================\n");
@@ -25,10 +28,9 @@ void kmain(multiboot_info_t* mbd, uint32_t magic) {
     print_string("Heap Allocator: Ready\n");  // ADD THIS LINE
     print_string("Interrupts: Ready\n");
     print_string("\nType 'help' for available commands\n\n");
-    print_string("> ");
     
     // Main kernel loop
     while (1) {
-        __asm__ volatile("hlt");
+        task_yield();
     }
 }
