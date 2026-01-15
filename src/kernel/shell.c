@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include "shell.h"
 #include "kmalloc.h"
+#include "task.h"
+#include "timer.h"
 
 char shell_buffer[256];
 int buffer_idx = 0;
@@ -23,6 +25,8 @@ void shell_execute(char* cmd) {
         print_string("  mem        - Show memory info\n");
         print_string("  echo <msg> - Print message\n");
         print_string("  version    - Show OS version\n");
+        print_string("  ps         - Show process list\n");
+        print_string("  uptime     - Show uptime\n");
         print_string("  reboot     - Restart system\n");
         
     } else if (strcmp(cmd, "clear") == 0) {
@@ -70,6 +74,18 @@ void shell_execute(char* cmd) {
         print_string(" bytes\n  Free: ");
         kprint_hex(stats.free_size);
         print_string(" bytes\n");
+    } else if (strcmp(cmd, "ps") == 0) {
+        task_list();
+    } else if (strcmp(cmd, "uptime") == 0) {
+        uint32_t h, m, s;
+        timer_get_uptime(&h, &m, &s);
+        print_string("Uptime: ");
+        kprint_hex(h);
+        print_string("h ");
+        kprint_hex(m);
+        print_string("m ");
+        kprint_hex(s);
+        print_string("s\n");
     } else if (cmd[0] != '\0') {
         print_string("Unknown command: ");
         print_string(cmd);
