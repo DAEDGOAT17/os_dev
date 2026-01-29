@@ -73,16 +73,16 @@ void shell_execute(char* cmd) {
         print_string("\n=== Kernel Heap ===\n\n");
 
         print_string("  Total : ");
-        kprint_dec(stats.total_size);
-        print_string(" bytes\n");
+        kprint_dec(stats.total_size / (1024 * 1024));
+        print_string(" MB\n");
 
         print_string("  Used  : ");
-        kprint_dec(stats.used_size);
-        print_string(" bytes\n");
+        kprint_dec(stats.used_size / (1024 * 1024));
+        print_string(" MB (roughly)\n");
 
         print_string("  Free  : ");
-        kprint_dec(stats.free_size);
-        print_string(" bytes\n");
+        kprint_dec(stats.free_size / (1024 * 1024));
+        print_string(" MB\n");
         print_string("\n");
     } else if (strcmp(cmd, "ps") == 0) {
         print_string("\n");
