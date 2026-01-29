@@ -1,5 +1,6 @@
 #include "vmm.h"
 #include "pmm.h"
+#include "io.h"
 #include <stdint.h>
 
 // The Page Directory (1024 entries, 4KB aligned)
@@ -61,4 +62,53 @@ void vmm_map_page(uint32_t virtual_addr, uint32_t physical_addr) {
     
     // Flush TLB for this address
     asm volatile("invlpg (%0)" : : "r"(virtual_addr) : "memory");
+}
+
+#include "screen.h"
+
+void page_fault_handler(uint32_t error_code, uint32_t faulting_addr) {
+    asm volatile("cli"); // Disable interrupts
+
+    print_string("\n\n\n");
+    print_string("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    print_string("           KERNEL PANIC: PAGE FAULT             \n");
+    print_string("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n");
+
+    print_string("Faulting Address: ");
+    kprint_hex(faulting_addr);
+    print_string("\n");
+
+    print_string("Error Code: ");
+    kprint_hex(error_code);
+    print_string(" (");
+
+    int present = !(error_code & 0x1);   // Page not present
+    int rw = error_code & 0x2;           // Write operation
+    int us = error_code & 0x4;           // Processor was in user-mode
+    int reserved = error_code & 0x8;      // Overwritten CPU-reserved bits of page entry
+    int id = error_code & 0x10;          // Caused by an instruction fetch
+
+    if (present) print_string("not-present ");
+    if (rw) print_string("read-only ");
+    if (us) print_string("user-mode ");
+    if (reserved) print_string("reserved ");
+    if (id) print_string("instruction-fetch ");
+    print_string(")\n\n");
+
+    print_string("The system will automatically reboot in 5 seconds...\n");
+
+    // Simple busy-wait since interrupts are disabled
+    for (int i = 5; i > 0; i--) {
+        print_string("Rebooting in ");
+        kprint_dec(i);
+        print_string("... \n");
+        
+        // Roughly 1 second delay (CPU dependent, works for QEMU)
+        for (volatile uint32_t j = 0; j < 100000000; j++) {
+            asm volatile("nop");
+        }
+    }
+
+    print_string("Rebooting now!\n");
+    sys_reboot();
 }

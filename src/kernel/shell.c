@@ -29,7 +29,13 @@ void shell_execute(char* cmd) {
         print_string("  ps         - Show process list\n");
         print_string("  uptime     - Show uptime\n");
         print_string("  reboot     - Restart system\n");
+        print_string("  crash      - Trigger a page fault\n");
         print_string("\n");
+        
+    } else if (strcmp(cmd, "crash") == 0) {
+        print_string("Triggering page fault...\n");
+        uint32_t *ptr = (uint32_t*)0xFFFF0000; // Address not mapped
+        *ptr = 0xDEADBEEF;
         
     } else if (strcmp(cmd, "clear") == 0) {
         clear_screen();
@@ -56,15 +62,7 @@ void shell_execute(char* cmd) {
         
     } else if (strcmp(cmd, "reboot") == 0) {
         print_string("Rebooting...\n");
-        // Pulse the CPU reset line
-        uint8_t temp;
-        asm volatile("cli");
-        do {
-            temp = inb(0x64);
-            if (temp & 0x01) inb(0x60);
-        } while (temp & 0x02);
-        outb(0x64, 0xFE);
-        asm volatile("hlt");
+        sys_reboot();
         
     } else if (strcmp(cmd, "heap") == 0) {
         heap_stats_t stats;

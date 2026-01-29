@@ -10,5 +10,6 @@
 
 void vmm_init();
 void vmm_map_page(uint32_t virtual_addr, uint32_t physical_addr);
+void page_fault_handler(uint32_t error_code, uint32_t faulting_addr);
 
 #endif

@@ -1,9 +1,29 @@
-bits 32
-extern keyboard_handler
-extern timer_handler
 global keyboard_asm_handler
 global timer_asm_handler
+global page_fault_asm_handler
 global dummy_exception_handler
+
+extern keyboard_handler
+extern timer_handler
+extern page_fault_handler
+
+; Page Fault Handler (IDT 14)
+; Note: CPU pushes an error code onto the stack automatically for Page Fault
+page_fault_asm_handler:
+    pusha                   ; Push EDI, ESI, EBP, ESP, EBX, EDX, ECX, EAX
+    
+    mov eax, cr2            ; The address that caused the fault is in CR2
+    push eax                ; Pass CR2 as the second argument
+    
+    mov eax, [esp + 36]     ; The error code is pushed by CPU before pusha (32 bytes) + CR2 (4 bytes)
+    push eax                ; Pass error code as the first argument
+    
+    call page_fault_handler
+    
+    add esp, 8              ; Clean up the two arguments we pushed
+    popa                    ; Restore registers
+    add esp, 4              ; Clean up the error code pushed by the CPU
+    iretd
 
 ; Generic Exception Handler (for IDT 0-31)
 dummy_exception_handler:
