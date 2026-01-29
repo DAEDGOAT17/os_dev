@@ -19,7 +19,7 @@ bool cmd_starts_with(const char* cmd, const char* prefix) {
 //shell execute function
 void shell_execute(char* cmd) {
     if (strcmp(cmd, "help") == 0) {
-        print_string("Available Commands:\n");
+        print_string("\n=== Available Commands ===\n\n");
         print_string("  help       - Show this message\n");
         print_string("  clear      - Clear screen\n");
         print_string("  mem        - Show system memory status\n");
@@ -29,17 +29,18 @@ void shell_execute(char* cmd) {
         print_string("  ps         - Show process list\n");
         print_string("  uptime     - Show uptime\n");
         print_string("  reboot     - Restart system\n");
+        print_string("\n");
         
     } else if (strcmp(cmd, "clear") == 0) {
         clear_screen();
         
     } else if (strcmp(cmd, "mem") == 0) {
-        print_string("Memory Status\n");
-        print_string("-------------\n");
-        print_string("Physical Memory : 128 MB\n");      // from multiboot later
-        print_string("Paging          : Enabled\n");
-        print_string("Page Size       : 4096 bytes\n");
-        print_string("Kernel Heap     : Active\n");
+        print_string("\n=== Memory Status ===\n\n");
+        print_string("  Physical Memory : 128 MB\n");
+        print_string("  Paging          : Enabled\n");
+        print_string("  Page Size       : 4096 bytes\n");
+        print_string("  Kernel Heap     : Active\n");
+        print_string("\n");
         
     } else if (cmd_starts_with(cmd, "echo ")) {
         // Print everything after "echo "
@@ -47,9 +48,11 @@ void shell_execute(char* cmd) {
         print_char('\n');
         
     } else if (strcmp(cmd, "version") == 0) {
-        print_string("JARVIS OS v0.1 Alpha\n");
-        print_string("Build: January 2026\n");
-        print_string("Architecture: i386\n");
+        print_string("\n=== JARVIS OS ===\n\n");
+        print_string("  Version      : v0.1 Alpha\n");
+        print_string("  Build        : January 2026\n");
+        print_string("  Architecture : i386\n");
+        print_string("\n");
         
     } else if (strcmp(cmd, "reboot") == 0) {
         print_string("Rebooting...\n");
@@ -67,36 +70,38 @@ void shell_execute(char* cmd) {
         heap_stats_t stats;
         kmalloc_get_stats(&stats);
 
-        print_string("Kernel Heap\n");
-        print_string("-----------\n");
+        print_string("\n=== Kernel Heap ===\n\n");
 
-        print_string("Total : ");
+        print_string("  Total : ");
         kprint_dec(stats.total_size);
         print_string(" bytes\n");
 
-        print_string("Used  : ");
+        print_string("  Used  : ");
         kprint_dec(stats.used_size);
         print_string(" bytes\n");
 
-        print_string("Free  : ");
+        print_string("  Free  : ");
         kprint_dec(stats.free_size);
         print_string(" bytes\n");
+        print_string("\n");
     } else if (strcmp(cmd, "ps") == 0) {
+        print_string("\n");
         task_list();
+        print_string("\n");
     } else if (strcmp(cmd, "uptime") == 0) {
         uint32_t h, m, s;
         timer_get_uptime(&h, &m, &s);
-        print_string("Uptime: ");
+        print_string("\n  System Uptime: ");
         kprint_dec(h);
         print_string("h ");
         kprint_dec(m);
         print_string("m ");
         kprint_dec(s);
-        print_string("s\n");
+        print_string("s\n\n");
     } else if (cmd[0] != '\0') {
-        print_string("Unknown command: ");
+        print_string("\n  Error: Unknown command '");
         print_string(cmd);
-        print_string("\nType 'help' for available commands.\n");
+        print_string("'\n  Type 'help' for available commands.\n\n");
     }
 }
 
@@ -110,7 +115,7 @@ void shell_input(char c) {
         shell_execute(shell_buffer);
         
         // Show prompt
-        print_string("> ");
+        print_string("JARVIS $ ");
         buffer_idx = 0;
         
     } else if (c == '\b' && buffer_idx > 0) {
@@ -125,7 +130,8 @@ void shell_input(char c) {
 
 //shell task function
 void shell_task(void) {
-    print_string("> ");
+    print_string("\n  Welcome to JARVIS OS!\n  Type 'help' for available commands.\n\n");
+    print_string("JARVIS $ ");
 
     while (1) {
         // Shell runs passively

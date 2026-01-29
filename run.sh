@@ -51,4 +51,4 @@ echo "-------------------------------------------"
 echo "DONE! Jarvis OS is ready."
 #echo "Run: qemu-system-i386 -cdrom jarvis.iso"
 echo "-------------------------------------------"
-qemu-system-i386 -cdrom jarvis.iso
+qemu-system-i386 -cdrom jarvis.iso -display gtk,zoom-to-fit=on -vga std
