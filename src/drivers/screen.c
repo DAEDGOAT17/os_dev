@@ -21,6 +21,26 @@ void clear_screen() {
     update_cursor();
 }
 
+void scroll() {
+    char *vga = (char*)0xB8000;
+    
+    // Move all lines up by one (copy line 1 to line 0, line 2 to line 1, etc.)
+    // We scroll at line 22 to keep lines 23-24 as bottom margin (2 lines of space)
+    for (int i = 0; i < 80 * 22; i++) {
+        vga[i * 2] = vga[(i + 80) * 2];
+        vga[i * 2 + 1] = vga[(i + 80) * 2 + 1];
+    }
+    
+    // Clear line 22 (where new content will appear)
+    for (int i = 80 * 22; i < 80 * 23; i++) {
+        vga[i * 2] = ' ';
+        vga[i * 2 + 1] = 0x07;
+    }
+    
+    // Move cursor to the beginning of line 22 (keeping 2 lines at bottom as margin)
+    cursor = 80 * 22;
+}
+
 void print_char(char c) {
     char *vga = (char*)0xB8000;
 
@@ -37,6 +57,12 @@ void print_char(char c) {
         vga[cursor * 2 + 1] = 0x07;
         cursor++;
     }
+    
+    // Check if we need to scroll - trigger at line 23 to maintain bottom space
+    if (cursor >= 80 * 23) {
+        scroll();
+    }
+    
     update_cursor();
 }
 
