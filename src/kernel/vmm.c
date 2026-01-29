@@ -5,8 +5,8 @@
 // The Page Directory (1024 entries, 4KB aligned)
 uint32_t page_directory[1024] __attribute__((aligned(4096)));
 
-// The first Page Table (Maps the first 4MB of RAM)
-uint32_t first_page_table[1024] __attribute__((aligned(4096)));
+// Static page tables for identity mapping the first 64MB (16 tables * 4MB)
+uint32_t boot_page_tables[16][1024] __attribute__((aligned(4096)));
 
 // We will define this in assembly later
 extern void vmm_load_page_directory(uint32_t* directory);
@@ -18,19 +18,18 @@ void vmm_init() {
         page_directory[i] = 0x00000002; // Not present, but Read/Write
     }
 
-    // 2. Identity Map the first 4MB (0 to 0x400000)
-    // We fill the Page Table with physical addresses
-    for (int i = 0; i < 1024; i++) {
-        // (i * 4096) is the physical address
-        // Attributes: Present + Writable
-        first_page_table[i] = (i * 4096) | (VMM_PRESENT | VMM_WRITABLE);
+    // 2. Identity Map the first 64MB (0 to 0x4000000)
+    // This provides enough mapped space for the kernel, heap, and page tables
+    for (int table = 0; table < 16; table++) {
+        for (int i = 0; i < 1024; i++) {
+            uint32_t addr = (table * 4096 * 1024) + (i * 4096);
+            boot_page_tables[table][i] = addr | (VMM_PRESENT | VMM_WRITABLE);
+        }
+        // Put the Page Table into the Page Directory
+        page_directory[table] = ((uint32_t)boot_page_tables[table]) | (VMM_PRESENT | VMM_WRITABLE);
     }
 
-    // 3. Put the Page Table into the Page Directory
-    // Entry 0 in the directory covers the first 4MB
-    page_directory[0] = ((uint32_t)first_page_table) | (VMM_PRESENT | VMM_WRITABLE);
-
-    // 4. Hand the Directory to the CPU and Enable Paging
+    // 3. Hand the Directory to the CPU and Enable Paging
     vmm_load_page_directory(page_directory);
     vmm_enable_paging();
 }

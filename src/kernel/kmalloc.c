@@ -5,7 +5,7 @@
 
 // Heap starts at 8MB (after identity-mapped region)
 #define HEAP_START 0x800000
-#define HEAP_SIZE  (4 * 1024 * 1024)  // 4MB heap
+#define HEAP_SIZE  (16 * 1024 * 1024)  // 16MB heap
 
 // Block header structure
 typedef struct block_header {

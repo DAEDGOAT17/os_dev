@@ -36,7 +36,7 @@ void shell_execute(char* cmd) {
         
     } else if (strcmp(cmd, "mem") == 0) {
         print_string("\n=== Memory Status ===\n\n");
-        print_string("  Physical Memory : 128 MB\n");
+        print_string("  Physical Memory : 256 MB\n");
         print_string("  Paging          : Enabled\n");
         print_string("  Page Size       : 4096 bytes\n");
         print_string("  Kernel Heap     : Active\n");
