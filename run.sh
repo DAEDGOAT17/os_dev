@@ -49,5 +49,6 @@ grub-mkrescue -o jarvis.iso iso/
 
 echo "-------------------------------------------"
 echo "DONE! Jarvis OS is ready."
-echo "Run: qemu-system-i386 -cdrom jarvis.iso"
+#echo "Run: qemu-system-i386 -cdrom jarvis.iso"
 echo "-------------------------------------------"
+qemu-system-i386 -m 256M -cdrom jarvis.iso -display gtk,zoom-to-fit=on -vga std

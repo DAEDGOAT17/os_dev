@@ -32,6 +32,10 @@ void keyboard_handler() {
             shift_pressed = true;
         } else if (scancode == 0x3A) {
             caps_lock = !caps_lock;
+        } else if (scancode == 0x49) { // Page Up
+            scroll_up();
+        } else if (scancode == 0x51) { // Page Down
+            scroll_down();
         } else {
             char c = shift_pressed ? kbd_us_shift[scancode] : kbd_us[scancode];
             if (caps_lock && c >= 'a' && c <= 'z') c -= 32;

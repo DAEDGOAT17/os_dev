@@ -1,6 +1,6 @@
 #include "idt.h"
 #include "io.h"
-#include "screen.h"
+#include "timer.h"
 
 struct idt_entry idt[256];
 struct idt_ptr idtp;
@@ -8,12 +8,7 @@ struct idt_ptr idtp;
 extern void idt_load(uint32_t ptr);
 extern void keyboard_asm_handler();
 extern void timer_asm_handler();
-extern void dummy_exception_handler();
-
-void timer_handler() {
-    outb(0x20, 0x20);
-}
-
+extern void page_fault_asm_handler();
 extern void dummy_exception_handler();
 
 void pic_remap() {
@@ -51,8 +46,11 @@ void init_idt() {
 
     // 3. Remap PIC
     pic_remap();
+    // Initialize timer
+    timer_init(100);  // 100 Hz (10ms per tick)
 
     // 4. Set Hardware IRQs
+    idt_set_gate(14, (uint32_t)page_fault_asm_handler, 0x08, 0x8E);
     idt_set_gate(32, (uint32_t)timer_asm_handler, 0x08, 0x8E);
     idt_set_gate(33, (uint32_t)keyboard_asm_handler, 0x08, 0x8E);
 
