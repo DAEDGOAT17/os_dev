@@ -31,3 +31,8 @@ serial.log
 # --- text files (local development files) ---
 *.txt
 .clangd
+
+# --- Documentation (generated/local) ---
+tutorials/
+DOCUMENTATION.md
+QUICK_REF.sh

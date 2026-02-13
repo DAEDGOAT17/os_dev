@@ -1,48 +1,12 @@
-# Jarvis OS
+# Jarvis OS - Educational OS Kernel
 
-A custom 32-bit x86 monolithic kernel built from scratch.
+> A custom 32-bit x86 monolithic kernel built from scratch for learning OS internals.
 
-Jarvis OS is a "Higher-Half" kernel designed to explore core operating system concepts, including manual memory management, interrupt-driven I/O, and hardware abstraction.
-
----
-
-##  Key Features
-
-- **Bootloader**: Multiboot-compliant GRUB loading mechanism
-- **Memory Management**:
-  - **PMM**: Physical Memory Manager using bitmap allocation (~128MB RAM)
-  - **VMM**: Virtual Memory Manager with 2-level paging (page directories and tables)
-- **Interrupts**: Custom IDT with PIC remapping for hardware IRQs
-- **Drivers**:
-  - **VGA**: Text-mode driver with hardware cursor control and scrolling
-  - **Keyboard**: US-QWERTY driver with Shift and Caps Lock support
-- **Shell**: Interactive command-line interface with command buffer
+**Status**: Early Development | **License**: Open Source | **Target**: Students & Learning
 
 ---
 
-## 📂 Project Structure
-
-```
-.
-├── src/
-│   ├── arch/i386/    # GDT, IDT, PIC, and I/O logic
-│   ├── asm/          # Assembly entry points
-│   ├── drivers/      # Keyboard and VGA drivers
-│   └── kernel/       # Core functionality (PMM, VMM, shell)
-├── include/          # Header files
-├── build/            # Compiled objects (ignored)
-├── iso/              # GRUB configuration
-├── link.ld           # Linker script
-└── run.sh            # Build and emulation script
-```
-
-## Getting Started
-
-**Prerequisites:**
-
-- Linux environment with gcc, binutils (32-bit), nasm, grub-mkrescue, xorriso, and qemu-system-i386
-
-**Build and Run:**
+## 🎯 Quick Start
 
 ```bash
 chmod +x run.sh
