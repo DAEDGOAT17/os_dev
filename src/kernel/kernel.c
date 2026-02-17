@@ -6,6 +6,7 @@
 #include "kmalloc.h" 
 #include "task.h"
 #include "shell.h"
+// Keep kmain minimal: boot prints general info only
 
 void kmain(multiboot_info_t* mbd, uint32_t magic) {
     // Initialize core systems
@@ -28,6 +29,8 @@ void kmain(multiboot_info_t* mbd, uint32_t magic) {
     print_string("Heap Allocator: Ready\n");  // ADD THIS LINE
     print_string("Interrupts: Ready\n");
     print_string("\nType 'help' for available commands\n\n");
+    
+    // No automatic hardware scans or tests at boot; use shell commands instead.
     
     // Main kernel loop
     while (1) {

@@ -14,6 +14,16 @@ void wait_io() {
     outb(0x80, 0); 
 }
 
+uint32_t inl(unsigned short port) {
+    uint32_t ret;
+    asm volatile ("inl %1, %0" : "=a"(ret) : "Nd"(port));
+    return ret;
+}
+
+void outl(unsigned short port, uint32_t val) {
+    asm volatile ("outl %0, %1" : : "a"(val), "Nd"(port));
+}
+
 void sys_reboot() {
     uint8_t temp;
     asm volatile("cli");

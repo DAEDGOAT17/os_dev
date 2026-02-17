@@ -13,6 +13,21 @@ section .multiboot_header
 section .text
 loader:
     mov esp, stack_top
+    ; Enable FPU and SSE: clear CR0.EM, set CR0.MP and CR0.NE, set CR4.OSFXSR and CR4.OSXMMEXCPT
+    mov eax, cr0
+    ; Clear EM (bit 2) to enable x87 FPU, set MP (bit1) and NE (bit5)
+    and eax, 0xFFFFFFFB    ; Clear bit 2 (EM)
+    or  eax, 0x00000022    ; Set bits 1 (MP) and 5 (NE)
+    mov cr0, eax
+
+    mov eax, cr4
+    ; Set OSFXSR (bit 9) and OSXMMEXCPT (bit 10) to enable SSE / FXSAVE support
+    or  eax, 0x00000600
+    mov cr4, eax
+
+    ; Initialize x87 FPU state
+    fninit
+
     push eax
     push ebx
     call kmain

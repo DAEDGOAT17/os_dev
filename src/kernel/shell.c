@@ -6,6 +6,9 @@
 #include "kmalloc.h"
 #include "task.h"
 #include "timer.h"
+#include "pci.h"
+#include "math.h"
+#include <stdint.h>
 
 char shell_buffer[256];
 int buffer_idx = 0;
@@ -30,6 +33,8 @@ void shell_execute(char* cmd) {
         print_string("  uptime     - Show uptime\n");
         print_string("  reboot     - Restart system\n");
         print_string("  crash      - Trigger a page fault\n");
+        print_string("  pci-scan   - Scan PCI bus for multimedia audio controllers\n");
+        print_string("  mat-test   - Run a small fixed-point matrix multiply test\n");
         print_string("\n");
         
     } else if (strcmp(cmd, "crash") == 0) {
@@ -63,6 +68,40 @@ void shell_execute(char* cmd) {
     } else if (strcmp(cmd, "reboot") == 0) {
         print_string("Rebooting...\n");
         sys_reboot();
+
+    } else if (strcmp(cmd, "pci-scan") == 0) {
+        // Run PCI scan and print multimedia audio controllers
+        pci_scan_multimedia();
+
+    } else if (strcmp(cmd, "mat-test") == 0) {
+        // Run a small fixed-point 2x2 matrix multiply test
+        const uint8_t FRAC = 16;
+        const uint32_t n = 2;
+        int32_t A[4] = { (1<<FRAC), (32768), (-1<<FRAC), (2<<FRAC) };
+        int32_t B[4] = { (2<<FRAC), ( (uint32_t)(1<<FRAC) + (uint32_t)(32768) ), (16384), (-32768) };
+        int32_t C[4] = {0,0,0,0};
+        mat_mul_fixed(A, B, C, n, FRAC);
+        print_string("Matrix multiply test (fixed 16.16):\n");
+        for (uint32_t i = 0; i < n; ++i) {
+            for (uint32_t j = 0; j < n; ++j) {
+                print_string("C["); kprint_dec(i); print_string("]["); kprint_dec(j); print_string("] = ");
+                // print fixed-point value
+                int64_t t = C[i*n + j];
+                int neg = 0;
+                if (t < 0) { neg = 1; t = -t; }
+                uint32_t intpart = (uint32_t)(t >> FRAC);
+                uint32_t fracmask = ((uint32_t)1 << FRAC) - 1;
+                uint32_t frac = (uint32_t)(t & fracmask);
+                uint32_t frac3 = (uint32_t)(((uint64_t)frac * 1000 + (1ULL << (FRAC-1))) >> FRAC);
+                if (neg) print_string("-");
+                kprint_dec(intpart);
+                print_string(".");
+                if (frac3 < 100) { if (frac3 < 10) print_string("00"); else print_string("0"); }
+                kprint_dec(frac3);
+                print_string("\n");
+            }
+        }
+        print_string("End matrix test.\n");
         
     } else if (strcmp(cmd, "heap") == 0) {
         heap_stats_t stats;
