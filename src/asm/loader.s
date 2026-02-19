@@ -28,9 +28,12 @@ loader:
     ; Initialize x87 FPU state
     fninit
 
-    push eax
     push ebx
+    push eax
     call kmain
+    
+    cli
+    hlt
 
 ; Takes the GDT pointer from C and applies it to the CPU
 gdt_flush:

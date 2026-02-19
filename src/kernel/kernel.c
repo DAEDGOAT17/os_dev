@@ -8,16 +8,35 @@
 #include "shell.h"
 // Keep kmain minimal: boot prints general info only
 
-void kmain(multiboot_info_t* mbd, uint32_t magic) {
-    // Initialize core systems
+void kmain(uint32_t magic, multiboot_info_t* mbd) {
+    // Initialize GDT FIRST before anything else
     init_gdt();
+    
+    // Clear screen early so we can see output
+    clear_screen();
+    print_string("Kernel: Init GDT OK\n");
+    
+    // Now init IDT after screen works
     init_idt();
+    print_string("Kernel: Init IDT OK\n");
+    
     pmm_init(mbd);
+    print_string("Kernel: PMM OK\n");
+    
     vmm_init();
-    kmalloc_init();  
+    print_string("Kernel: VMM OK\n");
+    
+    kmalloc_init();
+    print_string("Kernel: Kmalloc OK\n");
+    
     task_init();
+    print_string("Kernel: Task OK\n");
+    
     task_create("shell", shell_task, 1);
+    
+    // Enable interrupts AFTER everything is ready
     asm volatile("sti");
+    print_string("Kernel: Interrupts enabled\n");
 
     // Clear screen and show welcome message
     clear_screen();
