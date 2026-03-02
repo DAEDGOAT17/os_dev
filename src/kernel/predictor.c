@@ -88,6 +88,8 @@ const char* predictor_suggest(const char* input) {
 }
 
 
+#define MAX_MATCHES 16
+
 int predictor_get_matches(const char* input,
                           const char** results,
                           int max_results)

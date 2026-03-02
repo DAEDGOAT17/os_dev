@@ -8,10 +8,12 @@
 #include "timer.h"
 #include "pci.h"
 #include "math.h"
+#include "predictor.h"
 #include <stdint.h>
 
 char shell_buffer[256];
 int buffer_idx = 0;
+int tab_press_count = 0;
 
 // Helper function to compare command with argument for shell
 bool cmd_starts_with(const char* cmd, const char* prefix) {
@@ -144,24 +146,102 @@ void shell_execute(char* cmd) {
 
 //shell input function
 void shell_input(char c) {
+
+    /* ================= TAB ================= */
+    if (c == '\t') {
+
+        shell_buffer[buffer_idx] = '\0';
+
+        const char* matches[16];
+        int match_count = predictor_get_matches(shell_buffer, matches, 16);
+
+        if (match_count == 0)
+            return;
+
+        /* ---- SINGLE TAB ---- */
+        if (tab_press_count == 0) {
+
+            char prefix[64];
+            int len = predictor_longest_common_prefix(shell_buffer, prefix);
+
+            if (len > buffer_idx) {
+
+                for (int i = buffer_idx; i < len && i < 255; i++) {
+                    shell_buffer[i] = prefix[i];
+                    print_char(prefix[i]);
+                }
+
+                buffer_idx = len;
+                shell_buffer[len] = '\0';
+            }
+
+            tab_press_count = 1;
+        }
+
+        /* ---- DOUBLE TAB ---- */
+        else {
+
+            print_string("\n");
+
+            for (int i = 0; i < match_count; i++) {
+                print_string(matches[i]);
+                print_string("  ");
+            }
+
+            print_string("\nJARVIS $ ");
+            print_string(shell_buffer);
+
+            tab_press_count = 0;
+        }
+
+        return;
+    }
+
+    /* ================= ENTER ================= */
     if (c == '\n') {
+
         shell_buffer[buffer_idx] = '\0';
         print_char('\n');
-        
-        // Execute command
+
+        const char* suggestion = predictor_suggest(shell_buffer);
+
+        if (suggestion && strcmp(shell_buffer, suggestion) != 0) {
+            print_string("  Did you mean ----> ");
+            print_string(suggestion);
+            print_string("\n");
+        }
+
         shell_execute(shell_buffer);
-        
-        // Show prompt
+        predictor_learn(shell_buffer);
+
         print_string("JARVIS $ ");
+
         buffer_idx = 0;
-        
-    } else if (c == '\b' && buffer_idx > 0) {
+        tab_press_count = 0;
+        return;
+    }
+
+    /* ================= BACKSPACE ================= */
+    if (c == '\b' && buffer_idx > 0) {
+
         buffer_idx--;
+
+        /* Proper erase */
         print_char('\b');
-        
-    } else if (buffer_idx < 255 && c >= ' ') {
+        print_char(' ');
+        print_char('\b');
+
+        tab_press_count = 0;
+        return;
+    }
+
+    /* ================= NORMAL CHAR ================= */
+    if (buffer_idx < 255 && c >= ' ') {
+
         shell_buffer[buffer_idx++] = c;
         print_char(c);
+
+        tab_press_count = 0;
     }
 }
 

@@ -164,7 +164,7 @@ void print_char(char c) {
     update_cursor();
 }
 
-void print_string(char* str) {
+void print_string(const char* str) {
     while (*str) print_char(*str++);
 }
 
