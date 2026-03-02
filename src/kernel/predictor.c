@@ -24,10 +24,11 @@ static command_t commands[MAX_COMMANDS] = {
     {"reboot", 0},
     {"crash", 0},
     {"pci-scan", 0},
-    {"mat-test", 0}
+    {"mat-test", 0},
+    {"nlp" ,0}
 };
 
-static int total_commands = 12;
+static int total_commands = sizeof(commands) / sizeof(commands[0]);
 
 /* --- Prefix match --- */
 static int starts_with(const char* str, const char* prefix) {

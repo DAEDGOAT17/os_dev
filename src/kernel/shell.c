@@ -9,6 +9,7 @@
 #include "pci.h"
 #include "math.h"
 #include "predictor.h"
+#include "nlp.h"
 #include <stdint.h>
 
 char shell_buffer[256];
@@ -37,6 +38,7 @@ void shell_execute(char* cmd) {
         print_string("  crash      - Trigger a page fault\n");
         print_string("  pci-scan   - Scan PCI bus for multimedia audio controllers\n");
         print_string("  mat-test   - Run a small fixed-point matrix multiply test\n");
+        print_string("  nlp-test   - Run embedded NLP intent rule based classifier (incomplete) \n");
         print_string("\n");
         
     } else if (strcmp(cmd, "crash") == 0) {
@@ -137,7 +139,13 @@ void shell_execute(char* cmd) {
         print_string("m ");
         kprint_dec(s);
         print_string("s\n\n");
-    } else if (cmd[0] != '\0') {
+    }else if (cmd_starts_with(cmd, "nlp ")) {
+
+        nlp_result_t res = nlp_process(cmd + 4);
+        print_string("\n  intent ---> shell command  : ");
+        print_string(res.mapped_command);
+        print_string("\n\n");
+    }else if (cmd[0] != '\0') {
         print_string("\n  Error: Unknown command '");
         print_string(cmd);
         print_string("'\n  Type 'help' for available commands.\n\n");
