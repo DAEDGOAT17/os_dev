@@ -11,6 +11,7 @@
 #include "predictor.h"
 #include "nlp.h"
 #include <stdint.h>
+#include "intent_learner.h"
 
 
 char shell_buffer[256];
@@ -24,61 +25,55 @@ bool cmd_starts_with(const char* cmd, const char* prefix) {
     return prefix[i] == '\0';
 }
 
-void shell_execute(char* cmd)
-{
-    if (cmd[0] == '\0')
-        return;
-
-    Prediction pred = predict_intent(cmd);
-
-    if (pred.confidence > 20.0f) {
-
+void shell_execute(char* cmd) {
+    if (cmd[0] == '\0') return;
+    
+    // Predict using learned model
+    IntentPrediction pred = predict_intent_learned(cmd);
+    
+    if (pred.confidence > 40.0f) {
+        print_string("\n[AI] I think you mean: ");
+        print_string(pred.intent);
+        print_string(" [");
+        kprint_dec((uint32_t)pred.confidence);
+        print_string("%]\n");
+        
+        // Execute
         if (strcmp(pred.intent, "mem") == 0) {
-
-            print_string("\n=== Memory Status ===\n\n");
-            print_string("Physical Memory : 256 MB\n\n");
-
+            print_string("Physical Memory: 256 MB\n");
         }
         else if (strcmp(pred.intent, "ps") == 0) {
-
-            print_string("\nRunning Tasks:\n");
             task_list();
-            print_string("\n");
-
         }
-        else if (strcmp(pred.intent, "clear") == 0) {
-
-            clear_screen();
-
-        }
-        else if (strcmp(pred.intent, "reboot") == 0) {
-
-            print_string("Rebooting...\n");
-            sys_reboot();
-
-        }
-        else if (strcmp(pred.intent, "help") == 0) {
-
-            print_string("\nAvailable semantic commands:\n");
-            print_string("- memory\n- processes\n- reboot\n- clear\n\n");
-        }
-
-        print_string("Intent ---> shell command : ");
-        print_string(pred.intent);
-        print_string("  (");
-        kprint_dec((uint32_t)pred.confidence);
-        print_string("% confidence)\n\n");
+        // ... etc ...
+        
+        print_string("\n");
+    }
+    else if (cmd_starts_with(cmd, "correct ")) {
+        const char* correct_intent = cmd + 8;  // Skip "correct "
+        
+        print_string("\n[LEARNING] You say it should be: ");
+        print_string(correct_intent);
+        print_string("\n");
+        
+        // Get the last input (from context)
+        train_intent(correct_intent, shell_buffer);
+        
+        print_string("[LEARNING] I'll remember that!\n\n");
+    }
+    else if (strcmp(cmd, "show vocab") == 0) {
+        show_learned_vocabulary();
+        show_learned_intents();
     }
     else {
-
-        print_string("\nNot confident in understanding.\n");
-        print_string("Try rephrasing.\n\n");
+        print_string("\n[AI] Not sure what you mean :(");
+        print_string("\n[AI] Try: 'correct <intent>' to teach me\n");
+        print_string("Example: correct mem\n\n");
     }
 }
 //shell input function
 void shell_input(char c)
 {
-    /* ================= ENTER ================= */
     if (c == '\n') {
 
         shell_buffer[buffer_idx] = '\0';
@@ -92,7 +87,6 @@ void shell_input(char c)
         return;
     }
 
-    /* ================= BACKSPACE ================= */
     if (c == '\b' && buffer_idx > 0) {
 
         buffer_idx--;
@@ -104,7 +98,6 @@ void shell_input(char c)
         return;
     }
 
-    /* ================= NORMAL CHAR ================= */
     if (buffer_idx < 255 && c >= ' ') {
 
         shell_buffer[buffer_idx++] = c;

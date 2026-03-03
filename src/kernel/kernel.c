@@ -6,6 +6,10 @@
 #include "kmalloc.h" 
 #include "task.h"
 #include "shell.h"
+#include "intent_learner.h"
+#include "word_embeddings.h"
+
+extern uint32_t word_count;
 // Keep kmain minimal: boot prints general info only
 
 void kmain(uint32_t magic, multiboot_info_t* mbd) {
@@ -40,6 +44,35 @@ void kmain(uint32_t magic, multiboot_info_t* mbd) {
 
     // Clear screen and show welcome message
     clear_screen();
+
+        print_string("Kernel: Initializing AI Intent System...\n");
+    
+    // Train the AI with examples
+    // (These are the initial "seed" examples - it learns from user input after)
+    
+    train_intent("mem", "show memory");
+    train_intent("mem", "how much ram");
+    train_intent("mem", "check memory usage");
+    train_intent("mem", "display memory");
+    
+    train_intent("ps", "list processes");
+    train_intent("ps", "show running tasks");
+    train_intent("ps", "what is running");
+    train_intent("ps", "list all tasks");
+    
+    train_intent("clear", "clear screen");
+    train_intent("clear", "clean display");
+    train_intent("clear", "reset screen");
+    
+    train_intent("reboot", "restart system");
+    train_intent("reboot", "reboot now");
+    train_intent("reboot", "shutdown");
+    
+    print_string("Kernel: AI Intent System Ready\n");
+    print_string("Kernel: Vocabulary: ");
+    kprint_dec(get_word_count());
+
+    print_string(" words learned\n");
     print_string("=================================\n");
     print_string("     JARVIS OS v0.1 Alpha\n");
     print_string("=================================\n");
