@@ -20,6 +20,20 @@ int strlen(const char *s)
     return len;
 }
 
+char* strcpy(char* dest, const char* src)
+{
+    char* original = dest;
+
+    while (*src) {
+        *dest = *src;
+        dest++;
+        src++;
+    }
+
+    *dest = '\0';
+    return original;
+}
+
 
 
 char* strstr(const char* haystack, const char* needle)
