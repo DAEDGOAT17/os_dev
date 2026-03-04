@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define EMBEDDING_DIM 16
+#define EMBEDDING_DIM 32
 
 // Get embedding for a word (creates it if doesn't exist)
 float* get_word_embedding(const char* word);
@@ -19,6 +19,7 @@ void learn_intent_association(const char* input, const char* correct_intent);
 
 // Debug: show what the AI learned
 void show_learned_vocabulary(void);
+int get_or_create_word(const char *word);
 
 // Get total word count
 int get_word_count(void);

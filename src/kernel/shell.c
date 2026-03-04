@@ -12,6 +12,8 @@
 #include "nlp.h"
 #include <stdint.h>
 #include "intent_learner.h"
+#include "intent_config.h"
+#include "neural_net.h"
 
 
 char shell_buffer[256];
@@ -28,49 +30,62 @@ bool cmd_starts_with(const char* cmd, const char* prefix) {
 void shell_execute(char* cmd) {
     if (cmd[0] == '\0') return;
     
-    // Predict using learned model
-    IntentPrediction pred = predict_intent_learned(cmd);
+    // Use neural network for prediction
+    NeuralPrediction pred = neural_predict(cmd);
     
-    if (pred.confidence > 40.0f) {
-        print_string("\n[AI] I think you mean: ");
+    if (pred.confidence > 30.0f) {
+        print_string("\n[NEURAL AI] Predicted: ");
         print_string(pred.intent);
         print_string(" [");
         kprint_dec((uint32_t)pred.confidence);
         print_string("%]\n");
         
-        // Execute
+        // Show confidence for all intents (debugging)
+        print_string("  Logits: ");
+        for (int i = 0; i < 5; i++) {  // Show top 5
+            kprint_dec((uint32_t)(pred.logits[i] * 100));
+            print_string("% ");
+        }
+        print_string("\n\n");
+        
+        // Execute the predicted intent
         if (strcmp(pred.intent, "mem") == 0) {
-            print_string("Physical Memory: 256 MB\n");
+            print_string("Physical Memory: 256 MB\n\n");
         }
         else if (strcmp(pred.intent, "ps") == 0) {
             task_list();
         }
-        // ... etc ...
-        
-        print_string("\n");
-    }
-    else if (cmd_starts_with(cmd, "correct ")) {
-        const char* correct_intent = cmd + 8;  // Skip "correct "
-        
-        print_string("\n[LEARNING] You say it should be: ");
-        print_string(correct_intent);
-        print_string("\n");
-        
-        // Get the last input (from context)
-        train_intent(correct_intent, shell_buffer);
-        
-        print_string("[LEARNING] I'll remember that!\n\n");
-    }
-    else if (strcmp(cmd, "show vocab") == 0) {
-        show_learned_vocabulary();
-        show_learned_intents();
+        else if (strcmp(pred.intent, "clear") == 0) {
+            clear_screen();
+        }
+        else if (strcmp(pred.intent, "reboot") == 0) {
+            print_string("Rebooting...\n");
+            sys_reboot();
+        }
+        else if (strcmp(pred.intent, "help") == 0) {
+            print_string("Available commands:\n");
+            print_string("- Show memory\n");
+            print_string("- List processes\n");
+            print_string("- Clear screen\n");
+            print_string("- Restart system\n\n");
+        }
+        else if (cmd_starts_with(cmd, "train ")) {
+        const char* rest = cmd + 6;  // Skip "train "
+    
+    // Parse: "train <intent> <example>"
+    // For now, just print
+        print_string("\n[NEURAL] Training command received: ");
+        print_string(rest);
+        print_string("\n\n");
+}
     }
     else {
-        print_string("\n[AI] Not sure what you mean :(");
-        print_string("\n[AI] Try: 'correct <intent>' to teach me\n");
-        print_string("Example: correct mem\n\n");
+        print_string("\n[NEURAL AI] Not confident (");
+        kprint_dec((uint32_t)pred.confidence);
+        print_string("%). Try rephrasing.\n\n");
     }
 }
+
 //shell input function
 void shell_input(char c)
 {

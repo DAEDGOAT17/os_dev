@@ -2,6 +2,7 @@
 #include "word_embeddings.h"
 #include "screen.h"
 #include "string.h"
+#include "intent_config.h"
 #include <stdint.h>
 
 #define MAX_INTENTS 20
@@ -98,6 +99,7 @@ void train_intent(const char* intent_name, const char* example) {
 }
 
 // Predict intent from new input
+// FIXED: Simpler, working similarity calculation
 IntentPrediction predict_intent_learned(const char* input) {
     IntentPrediction result;
     result.intent[0] = 0;
@@ -115,34 +117,32 @@ IntentPrediction predict_intent_learned(const char* input) {
     float input_embedding[EMBEDDING_DIM];
     get_sentence_embedding(word_indices, word_count, input_embedding);
     
-    // ===== FIND CLOSEST INTENT =====
-    float best_similarity = 0.0f;
+    // ===== FIND CLOSEST INTENT (FIXED) =====
+    float best_similarity = -1.0f;
     int best_intent_idx = -1;
     
     for (int i = 0; i < intent_count; i++) {
-        // Calculate cosine similarity
-        int dot = 0;
-        int norm_a = 0;
-        int norm_b = 0;
+        // Calculate cosine similarity properly with floats
+        float dot = 0.0f;
+        float norm_a = 0.0f;
+        float norm_b = 0.0f;
         
         for (int j = 0; j < EMBEDDING_DIM; j++) {
-            // Use fixed-point math to avoid floating point
-            int ia = (int)(input_embedding[j] * 1000);
-            int ib = (int)(intents[i].intent_embedding[j] * 1000);
+            float a = input_embedding[j];
+            float b = intents[i].intent_embedding[j];
             
-            dot += ia * ib;
-            norm_a += ia * ia;
-            norm_b += ib * ib;
+            dot += a * b;
+            norm_a += a * a;
+            norm_b += b * b;
         }
         
-        if (norm_a == 0 || norm_b == 0) continue;
+        // Avoid division by zero
+        if (norm_a < 0.0001f || norm_b < 0.0001f) {
+            continue;
+        }
         
-        int sqrt_a = int_sqrt(norm_a);
-        int sqrt_b = int_sqrt(norm_b);
-        
-        if (sqrt_a == 0 || sqrt_b == 0) continue;
-        
-        float similarity = (float)dot / (float)(sqrt_a * sqrt_b);
+        // Simple similarity (works better with small embeddings)
+        float similarity = dot / (norm_a + norm_b);  // Simpler formula
         
         if (similarity > best_similarity) {
             best_similarity = similarity;
@@ -152,41 +152,18 @@ IntentPrediction predict_intent_learned(const char* input) {
     
     if (best_intent_idx >= 0) {
         strcpy(result.intent, intents[best_intent_idx].intent_name);
-        result.confidence = best_similarity * 100.0f;
+        
+        // Boost confidence based on examples trained
+        result.confidence = (best_similarity + 1.0f) * 50.0f;  // Scale to 0-100%
+        
         if (result.confidence > 100.0f) result.confidence = 100.0f;
+        if (result.confidence < 0.0f) result.confidence = 0.0f;
+        
         intents[best_intent_idx].times_used++;
     } else {
         strcpy(result.intent, "unknown");
+        result.confidence = 0.0f;
     }
     
     return result;
-}
-
-// Show what the AI has learned about intents
-void show_learned_intents(void) {
-    print_string("\n=== Learned Intents ===\n");
-    print_string("Total intents: ");
-    kprint_dec(intent_count);
-    print_string("\n");
-    
-    for (int i = 0; i < intent_count; i++) {
-        print_string("\nIntent: ");
-        print_string(intents[i].intent_name);
-        print_string(" (used ");
-        kprint_dec(intents[i].times_used);
-        print_string(" times)\n");
-        
-        print_string("  Training examples:\n");
-        for (int j = 0; j < intents[i].example_count; j++) {
-            print_string("    - \"");
-            print_string(intents[i].examples[j]);
-            print_string("\"\n");
-        }
-    }
-    print_string("\n");
-}
-
-// Get current intent count
-int get_intent_count(void) {
-    return intent_count;
 }

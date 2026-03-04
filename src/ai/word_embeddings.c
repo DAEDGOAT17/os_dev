@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 #define MAX_WORDS 200          // Will grow dynamically
-#define EMBEDDING_DIM 16       // Small but enough for kernel
+#define EMBEDDING_DIM 32       // Small but enough for kernel
 #define LEARNING_RATE 0.01f
 
 // Simple pseudo-random number generator (for kernel)
