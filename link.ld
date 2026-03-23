@@ -1,13 +1,14 @@
-ENTRY(loader)                /* The name of our entry label in loader.s */
+ENTRY(loader)
 
 SECTIONS
 {
-    . = 1M;                 /* The kernel starts at 1MB */
-
-    _kernel_start = .;      /* <--- ADD THIS LINE HERE */
+    . = 1M;
+    
+    _kernel_start = .;
 
     .text : {
-        *(.multiboot_header)
+        build/loader.o(.multiboot_header)
+        build/loader.o(.text)
         *(.text)
     }
 
@@ -20,5 +21,5 @@ SECTIONS
     }
 
     . = ALIGN(4096);
-    _kernel_end = .;        /* <--- ADD THIS LINE HERE */
+    _kernel_end = .;
 }

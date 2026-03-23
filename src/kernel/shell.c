@@ -11,6 +11,7 @@
 
 char shell_buffer[256];
 int buffer_idx = 0;
+int tab_press_count = 0;
 
 // Helper function to compare command with argument for shell
 bool cmd_starts_with(const char *cmd, const char *prefix) {
