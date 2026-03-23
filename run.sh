@@ -51,4 +51,15 @@ echo "-------------------------------------------"
 echo "DONE! Jarvis OS is ready."
 #echo "Run: qemu-system-i386 -cdrom jarvis.iso"
 echo "-------------------------------------------"
-qemu-system-i386 -m 256M -cdrom jarvis.iso -display gtk,zoom-to-fit=on -vga std
+
+# Create a dummy disk image if missing
+if [ ! -f disk.img ]; then
+    echo "Creating dummy 64MB disk image..."
+    dd if=/dev/zero of=disk.img bs=1M count=64
+fi
+if [ -f disk.img ]; then
+    qemu-system-i386 -m 256M -cdrom jarvis.iso -drive file=disk.img,format=raw,index=0,media=disk -boot order=dc -display curses -vga std -no-reboot
+else
+    qemu-system-i386 -m 256M -cdrom jarvis.iso -boot order=dc -display gtk,zoom-to-fit=on -vga std -no-reboot || \
+    qemu-system-i386 -m 256M -cdrom jarvis.iso -boot order=dc -display curses -vga std -no-reboot
+fi

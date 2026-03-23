@@ -6,9 +6,8 @@
 
 unsigned char inb(unsigned short port);
 void outb(unsigned short port, unsigned char val);
-uint32_t inl(unsigned short port);
-void outl(unsigned short port, uint32_t val);
-void wait_io();
+unsigned short inw(unsigned short port);
+void outw(unsigned short port, unsigned short val);
 void sys_reboot();
 
 #endif
