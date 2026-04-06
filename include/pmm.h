@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #define PMM_BLOCK_SIZE 4096
-#define PMM_BITMAP_SIZE 65536 // Tracks up to 2GB of RAM (in bytes: 64KB bitmap)
+#define PMM_BITMAP_SIZE 524288 // Tracks up to 16GB of RAM (in bytes: 512KB bitmap)
 
 typedef struct {
     uint32_t size;

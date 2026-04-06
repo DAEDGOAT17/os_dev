@@ -1,6 +1,7 @@
 #include "pmm.h"
 #include "screen.h"
 #include "acpi.h"
+#include <stdbool.h>
 
 // Global bitmap - resides in .bss section
 uint8_t pmm_bitmap[PMM_BITMAP_SIZE];
@@ -49,12 +50,12 @@ void pmm_init(uint32_t magic, void* mbd_ptr) {
 
             while((uint64_t)mmap < mmap_end) {
                 if (mmap->type == 1) { // Available RAM
-                    uint32_t addr = (uint32_t)mmap->addr;
-                    uint32_t len = (uint32_t)mmap->len;
-                    uint32_t end_addr = addr + len;
+                    uint64_t addr = mmap->addr;
+                    uint64_t len = mmap->len;
+                    uint64_t end_addr = addr + len;
                     
                     while (addr < end_addr) {
-                        uint32_t block = addr / PMM_BLOCK_SIZE;
+                        uint32_t block = (uint32_t)(addr / PMM_BLOCK_SIZE);
                         if (block < (PMM_BITMAP_SIZE * 8)) pmm_clear_bit(block);
                         addr += PMM_BLOCK_SIZE;
                     }
@@ -114,14 +115,14 @@ void pmm_init(uint32_t magic, void* mbd_ptr) {
                 for (uint32_t i = 0; i < num_entries; i++) {
                     multiboot2_mmap_entry_t* entry = (multiboot2_mmap_entry_t*)entry_ptr;
                     // Check entry validity and type
-                    if (entry->type == 1 && entry->addr < 0xFFFFFFFFULL) { // Available RAM within 4GB
-                        uint32_t addr = (uint32_t)entry->addr;
+                    if (entry->type == 1) { // Available RAM
+                        uint64_t addr = entry->addr;
                         uint64_t len = entry->len;
                         
                         // Break length into blocks and clear bits
                         uint32_t num_blocks = (uint32_t)(len / PMM_BLOCK_SIZE);
-                        for (uint32_t b = 0; b < num_blocks; b++) {
-                            uint32_t block = (addr / PMM_BLOCK_SIZE) + b;
+                        for (uint64_t b = 0; b < num_blocks; b++) {
+                            uint32_t block = (uint32_t)(addr / PMM_BLOCK_SIZE) + (uint32_t)b;
                             if (block < (PMM_BITMAP_SIZE * 8)) {
                                 pmm_clear_bit(block);
                             } else {
@@ -208,7 +209,7 @@ void* pmm_alloc_block() {
                 if (block >= last_free_bit && !(pmm_bitmap[i] & (1 << j))) {
                     pmm_set_bit(block);
                     last_free_bit = block + 1;
-                    return (void*)(uint64_t)(block * PMM_BLOCK_SIZE);
+                    return (void*)((uint64_t)block * PMM_BLOCK_SIZE);
                 }
             }
         }
@@ -222,7 +223,8 @@ void* pmm_alloc_block() {
                 if (block >= 256 && !(pmm_bitmap[i] & (1 << j))) {
                     pmm_set_bit(block);
                     last_free_bit = block + 1;
-                    return (void*)(uint64_t)(block * PMM_BLOCK_SIZE);
+                                        return (void*)((uint64_t)block * PMM_BLOCK_SIZE);
+
                 }
             }
         }
