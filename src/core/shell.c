@@ -11,13 +11,12 @@
 #include "fat32.h"
 #include "ata.h"
 #include "pmm.h"
-#include "llm_engine.h"
 
 
 char shell_buffer[256];
 int buffer_idx = 0;
 const char* commands[] = {
-    "ls", "cd", "cat", "touch", "write", "rm", "mkdir", "rmdir", "clear", "help", "ps", "mem", "reboot", "ai", "sysinfo", "cpuid", "arch", NULL
+    "ls", "cd", "cat", "touch", "write", "rm", "mkdir", "rmdir", "clear", "help", "ps", "mem", "reboot", "sysinfo", "cpuid", "arch", NULL
 };
 
 // Static variables for filename completion state
@@ -28,6 +27,8 @@ static int tc_prefix_len = 0;
 static bool tc_is_dir = false;
 
 void tc_callback(const char* name, uint8_t attr, uint32_t size, uint32_t cluster) {
+    (void)size;
+    (void)cluster;
     if (strncasecmp(name, tc_prefix, tc_prefix_len) == 0) {
         if (tc_match_count == 0) {
             strcpy(tc_best_match, name);
@@ -216,15 +217,6 @@ static void cmd_sysinfo() {
     print_string("  Used         : "); kprint_dec(used_kb / 1024); print_string(" MB\n");
     print_string("  Free         : "); kprint_dec(free_kb / 1024); print_string(" MB\n");
 
-    // --- AI Engine ---
-    set_text_color(MAKE_COLOR(COLOR_LIGHT_BLUE, COLOR_BLACK));
-    print_string("  =[ AI ENGINE ]===========================\n");
-    reset_text_color();
-    print_string("  Brain Module : ");
-    if (initrd_brain_loaded) { set_text_color(MAKE_COLOR(COLOR_LIGHT_GREEN, COLOR_BLACK)); print_string("Loaded (InitRD)"); }
-    else                     { set_text_color(MAKE_COLOR(COLOR_RED, COLOR_BLACK));         print_string("Not Loaded"); }
-    reset_text_color(); print_char('\n');
-
     uint32_t uptime_h, uptime_m, uptime_s;
     timer_get_uptime(&uptime_h, &uptime_m, &uptime_s);
     set_text_color(MAKE_COLOR(COLOR_LIGHT_BLUE, COLOR_BLACK));
@@ -382,8 +374,7 @@ void shell_execute(char* cmd) {
         print_string("- sysinfo      (Full system information)\n");
         print_string("- cpuid        (Raw CPU identity report)\n");
         print_string("- arch         (Confirm CPU architecture)\n");
-        print_string("- reboot       (Restart system)\n");
-        print_string("- ai <prompt>  (Query the AI engine)\n\n");
+        print_string("- reboot       (Restart system)\n\n");
         return;
     }
     else if (strcmp(cmd, "ps") == 0) {
@@ -411,21 +402,6 @@ void shell_execute(char* cmd) {
         print_string(" KB / ");
         kprint_dec(stats.total_size / 1024);
         print_string(" KB\n\n");
-        return;
-    }
-    else if (strcmp(cmd, "ai") == 0) {
-        if (!arg) { print_string("Usage: ai <prompt>\n"); return; }
-        char ai_response[128];
-        set_text_color(MAKE_COLOR(COLOR_LIGHT_CYAN, COLOR_BLACK));
-        print_string("Jarvis is thinking...\n");
-        reset_text_color();
-        llm_engine_generate(&global_model, arg, ai_response, 20);
-        set_text_color(MAKE_COLOR(COLOR_YELLOW, COLOR_BLACK));
-        print_string("\nJARVIS: ");
-        set_text_color(MAKE_COLOR(COLOR_WHITE, COLOR_BLACK));
-        print_string(ai_response);
-        print_char('\n');
-        reset_text_color();
         return;
     }
     else if (strcmp(cmd, "reboot") == 0) {
@@ -494,7 +470,6 @@ void shell_input(char c) {
 
         if (last_word == shell_buffer) {
             // Complete command
-            const char* match = NULL;
             int match_count = 0;
             char common_prefix[32];
             strcpy(common_prefix, "");
@@ -509,7 +484,6 @@ void shell_input(char c) {
                         common_prefix[j] = '\0';
                     }
                     match_count++;
-                    match = commands[i];
                 }
             }
 
@@ -576,6 +550,8 @@ void shell_input(char c) {
     }
 }
 
+extern char kbd_get(void);
+
 void shell_task(void) {
     static bool welcomed = false;
     if (!welcomed) {
@@ -591,5 +567,11 @@ void shell_task(void) {
         print_string("] $ ");
         reset_text_color();
         welcomed = true;
+    }
+
+    // Process input from buffer (prevents running commands in ISR context)
+    char c = kbd_get();
+    if (c) {
+        shell_input(c);
     }
 }

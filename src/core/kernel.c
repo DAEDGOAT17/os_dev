@@ -8,8 +8,6 @@
 #include "shell.h"
 #include "ata.h"
 #include "fat32.h"
-#include "llm_engine.h"
-extern uint32_t word_count;
 // Keep kmain minimal: boot prints general info only
 
 void kmain(uint32_t magic, multiboot_info_t* mbd) {
@@ -39,15 +37,15 @@ void kmain(uint32_t magic, multiboot_info_t* mbd) {
     print_string("Kernel: Task OK\n");
     
     // Initialize Filesystem
-    if (ata_init()) {
+    int fs_ok = ata_init();
+    if (fs_ok) {
         fat32_mount(0);
         print_string("Kernel: FAT32 OK\n");
     } else {
-        print_string("Kernel: ATA FAIL\n");
+        print_string("Kernel: ATA FAIL - No disk and no ramdisk\n");
     }
     
     task_create("shell", shell_task, 1);
-    llm_task_spawn();    
     asm volatile("sti");
     print_string("Kernel: Interrupts enabled\n");
 
@@ -89,7 +87,7 @@ void kmain(uint32_t magic, multiboot_info_t* mbd) {
     print_char('\n');
 
     print_color_string("  +--------------------------------------------------+\n", MAKE_COLOR(COLOR_LIGHT_BLUE, COLOR_BLACK));
-    print_color_string("  |       x86_64 AI Kernel  v1.0  --  64-bit         |\n", MAKE_COLOR(COLOR_YELLOW,     COLOR_BLACK));
+    print_color_string("  |       x86_64 OS Kernel  v1.0  --  64-bit         |\n", MAKE_COLOR(COLOR_YELLOW,     COLOR_BLACK));
     print_color_string("  +--------------------------------------------------+\n", MAKE_COLOR(COLOR_LIGHT_BLUE, COLOR_BLACK));
     print_char('\n');
 
@@ -122,13 +120,12 @@ void kmain(uint32_t magic, multiboot_info_t* mbd) {
     print_color_string("[OK] Dynamic  --  Base: 0x0000000200000000\n",  MAKE_COLOR(COLOR_LIGHT_GREEN, COLOR_BLACK));
 
     print_color_string("  File System  : ", MAKE_COLOR(COLOR_LIGHT_GREY, COLOR_BLACK));
-    print_color_string("[OK] FAT32  on  ATA Disk\n",                   MAKE_COLOR(COLOR_LIGHT_GREEN, COLOR_BLACK));
-
-    print_color_string("  AI Brain     : ", MAKE_COLOR(COLOR_LIGHT_GREY, COLOR_BLACK));
-    if (initrd_brain_loaded)
-        print_color_string("[OK] Loaded from InitRD Boot Module\n",    MAKE_COLOR(COLOR_LIGHT_GREEN,  COLOR_BLACK));
+    if (fs_ok && ramdisk_loaded)
+        print_color_string("[OK] FAT32  on  RAM Disk (32 MB, resets on reboot)\n", MAKE_COLOR(COLOR_LIGHT_GREEN, COLOR_BLACK));
+    else if (fs_ok)
+        print_color_string("[OK] FAT32  on  ATA Disk\n",                           MAKE_COLOR(COLOR_LIGHT_GREEN, COLOR_BLACK));
     else
-        print_color_string("[--] Not Found  (run export_nanogpt.py)\n",MAKE_COLOR(COLOR_YELLOW,       COLOR_BLACK));
+        print_color_string("[!!] No filesystem  --  disk commands unavailable\n",  MAKE_COLOR(COLOR_RED,         COLOR_BLACK));
 
     print_char('\n');
     print_color_string("  ================================================\n",  MAKE_COLOR(COLOR_LIGHT_BLUE, COLOR_BLACK));

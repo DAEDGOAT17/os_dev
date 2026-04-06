@@ -13,6 +13,7 @@ void vmm_init() {
     extern uint32_t fb_height;
     extern uint32_t fb_pitch;
 
+    // 1. Map Framebuffer
     if (fb_ptr) {
         uint64_t fb_size = (uint64_t)fb_height * fb_pitch;
         fb_size = (fb_size + 4095) & ~4095;
@@ -20,6 +21,20 @@ void vmm_init() {
             uint64_t addr = (uint64_t)fb_ptr + offset;
             vmm_map_page(addr, addr);
         }
+    }
+
+    // 2. Map Ramdisk Module (if loaded)
+    if (ramdisk_loaded && ramdisk_start != 0) {
+        uint64_t rd_size = (ramdisk_size + 4095) & ~4095;
+        for (uint64_t offset = 0; offset < rd_size; offset += 4096) {
+            uint64_t addr = ramdisk_start + offset;
+            vmm_map_page(addr, addr);
+        }
+    }
+
+    // 3. Identity map first 16MB to ensure kernel and page tables are available
+    for (uint64_t addr = 0; addr < 16 * 1024 * 1024; addr += 4096) {
+        vmm_map_page(addr, addr);
     }
 
     vmm_load_pml4((uint64_t)pml4_table);

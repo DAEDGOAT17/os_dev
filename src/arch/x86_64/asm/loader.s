@@ -101,26 +101,31 @@ loader:
     mov eax, pdpt_table
     or  eax, 0x3               ; P + RW
     mov [pml4_table], eax
+    mov dword [pml4_table + 4], 0
 
     ; PDPT[0] → PD
     mov eax, pd_table
-    or  eax, 0x3
+    or  eax, 0x3               ; P + RW
     mov [pdpt_table], eax
-
+    mov dword [pdpt_table + 4], 0
+    
     ; PDPT[1] → PD2
     mov eax, pd_table2
     or  eax, 0x3
     mov [pdpt_table + 8], eax
-
+    mov dword [pdpt_table + 12], 0
+    
     ; PDPT[2] → PD3
     mov eax, pd_table3
     or  eax, 0x3
     mov [pdpt_table + 16], eax
-
+    mov dword [pdpt_table + 20], 0
+    
     ; PDPT[3] → PD4
     mov eax, pd_table4
     or  eax, 0x3
     mov [pdpt_table + 24], eax
+    mov dword [pdpt_table + 28], 0
 
     ; PD: 2048 × 2 MB huge pages covering 0 – 4 GB
     mov ecx, 0

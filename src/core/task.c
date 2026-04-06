@@ -90,7 +90,7 @@ void task_list() {
 
 void task_yield() {
     // Simple round-robin scheduler
-    int start = current_task_id;
+    uint32_t start = current_task_id;
     
     do {
         current_task_id = (current_task_id + 1) % MAX_TASKS;

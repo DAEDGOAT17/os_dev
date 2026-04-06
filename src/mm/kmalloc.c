@@ -17,7 +17,7 @@ typedef struct block_header {
 static block_header_t* heap_start = NULL;
 
 void kmalloc_init() {
-    uint32_t total_ram = pmm_get_total_memory_kb() * 1024;
+    uint64_t total_ram = (uint64_t)pmm_get_total_memory_kb() * 1024;
     
     // Dynamically claim all remaining RAM above 8MB, leaving an 8MB safety buffer
     if (total_ram > HEAP_START + (8 * 1024 * 1024)) {
@@ -92,13 +92,15 @@ void kfree(void* ptr) {
     
     // Coalesce with previous block (simple linear search)
     block_header_t* current = heap_start;
-    while (current && current->next != block) {
+    while (current && current != block) {
+        if (current->next == block) {
+            if (current->is_free) {
+                current->size += sizeof(block_header_t) + block->size;
+                current->next = block->next;
+            }
+            break;
+        }
         current = current->next;
-    }
-    
-    if (current && current->is_free) {
-        current->size += sizeof(block_header_t) + block->size;
-        current->next = block->next;
     }
 }
 

@@ -112,7 +112,7 @@ static int create_entry(uint32_t parent_cluster, const char* name, uint8_t attr,
         for (int s = 0; s < bpb.sectors_per_cluster; s++) {
             ata_read_sectors(lba + s, 1, sector_buf);
             fat32_dir_entry_t* entries = (fat32_dir_entry_t*)sector_buf;
-            for (int i = 0; i < 512 / sizeof(fat32_dir_entry_t); i++) {
+            for (size_t i = 0; i < 512 / sizeof(fat32_dir_entry_t); i++) {
                 if (entries[i].name[0] == 0x00 || entries[i].name[0] == 0xE5) {
                     // Found a slot
                     memcpy(entries[i].name, name_8, 8);
@@ -219,7 +219,7 @@ static int recursive_rm(uint32_t cluster) {
         for (int s = 0; s < bpb.sectors_per_cluster; s++) {
             ata_read_sectors(lba + s, 1, sector_buf);
             fat32_dir_entry_t* entries = (fat32_dir_entry_t*)sector_buf;
-            for (int i = 0; i < 512 / sizeof(fat32_dir_entry_t); i++) {
+            for (size_t i = 0; i < 512 / sizeof(fat32_dir_entry_t); i++) {
                 if (entries[i].name[0] == 0x00) break;
                 if (entries[i].name[0] == 0xE5) continue;
                 if (entries[i].name[0] == '.') continue;
@@ -289,7 +289,7 @@ int fat32_rmdir(const char* path) {
         for (int s = 0; s < bpb.sectors_per_cluster && !found; s++) {
             ata_read_sectors(lba + s, 1, sector_buf);
             fat32_dir_entry_t* edentries = (fat32_dir_entry_t*)sector_buf;
-            for (int i = 0; i < 512 / sizeof(fat32_dir_entry_t); i++) {
+            for (size_t i = 0; i < 512 / sizeof(fat32_dir_entry_t); i++) {
                 if (edentries[i].name[0] == 0x00) break;
                 if (edentries[i].name[0] == 0xE5) continue;
                 if (memcmp(edentries[i].name, name_8, 8) == 0 && memcmp(edentries[i].ext, ext_3, 3) == 0) {
@@ -316,8 +316,22 @@ int fat32_mount(uint32_t lba_start) {
     
     memcpy(&bpb, sector0, sizeof(fat32_bpb_t));
     
+    print_string("FAT32: Attempting mount at LBA ");
+    kprint_dec(partition_lba);
+    print_string("\nFAT32: OEM: ");
+    for(int i=0; i<8; i++) print_char(bpb.oem[i]);
+    print_string(" | Sig: 0x");
+    kprint_hex(bpb.boot_signature);
+    print_char('\n');
+
     if (bpb.boot_signature != 0x29 && bpb.boot_signature != 0x28) {
-        print_string("FAT32: Invalid boot signature\n");
+        print_string("FAT32: [WARN] Non-standard boot signature found. Proceeding anyway.\n");
+    }
+
+    if (bpb.bytes_per_sector != 512) {
+        print_string("FAT32: [ERROR] Only 512 byte sectors supported. Found: ");
+        kprint_dec(bpb.bytes_per_sector);
+        print_char('\n');
         return -1;
     }
 
@@ -354,7 +368,7 @@ int fat32_list_dir(uint32_t cluster, fat32_dir_callback_t cb) {
             if (ata_read_sectors(lba + s, 1, sector_buf) != 0) return -1;
             
             fat32_dir_entry_t* entries = (fat32_dir_entry_t*)sector_buf;
-            for (int i = 0; i < 512 / sizeof(fat32_dir_entry_t); i++) {
+            for (size_t i = 0; i < 512 / sizeof(fat32_dir_entry_t); i++) {
                 if (entries[i].name[0] == 0x00) return 0;
                 if (entries[i].name[0] == 0xE5) continue;
                 if (entries[i].attributes == FAT_ATTR_LFN) continue;
@@ -399,7 +413,7 @@ uint32_t fat32_resolve_path(const char* path) {
             for (int s = 0; s < bpb.sectors_per_cluster && !found; s++) {
                 ata_read_sectors(lba + s, 1, sector_buf);
                 fat32_dir_entry_t* entries = (fat32_dir_entry_t*)sector_buf;
-                for (int i = 0; i < 512 / sizeof(fat32_dir_entry_t); i++) {
+                for (size_t i = 0; i < 512 / sizeof(fat32_dir_entry_t); i++) {
                     if (entries[i].name[0] == 0x00) break;
                     if (entries[i].name[0] == 0xE5) continue;
                     if (entries[i].attributes == FAT_ATTR_LFN) continue;
@@ -484,7 +498,7 @@ int fat32_open(const char* path, char mode) {
         for (int s = 0; s < bpb.sectors_per_cluster && !found; s++) {
             ata_read_sectors(lba + s, 1, sector_buf);
             fat32_dir_entry_t* entries = (fat32_dir_entry_t*)sector_buf;
-            for (int i = 0; i < 512 / sizeof(fat32_dir_entry_t); i++) {
+            for (size_t i = 0; i < 512 / sizeof(fat32_dir_entry_t); i++) {
                 if (entries[i].name[0] == 0x00) break;
                 if (entries[i].name[0] == 0xE5) continue;
                 if (memcmp(entries[i].name, name_8, 8) == 0 && memcmp(entries[i].ext, ext_3, 3) == 0) {
@@ -657,7 +671,6 @@ int fat32_write(int fd, const void* buf, uint32_t len) {
         uint32_t entry_idx = file->dir_entry_index;
         
         uint32_t entries_per_sector = 512 / sizeof(fat32_dir_entry_t);
-        uint32_t sector_in_cluster = (entry_idx / entries_per_sector) / bpb.sectors_per_cluster;
         // Wait, index is relative to start of cluster or global?
         // My index logic in OPEN was: (s * (512/sizeof)) + i; where s is sector in cluster.
         // So entry_idx is indeed relative to cluster start.
@@ -694,7 +707,7 @@ int fat32_unlink(const char* path) {
         for (int s = 0; s < bpb.sectors_per_cluster && !found; s++) {
             ata_read_sectors(lba + s, 1, sector_buf);
             fat32_dir_entry_t* entries = (fat32_dir_entry_t*)sector_buf;
-            for (int i = 0; i < 512 / sizeof(fat32_dir_entry_t); i++) {
+            for (size_t i = 0; i < 512 / sizeof(fat32_dir_entry_t); i++) {
                 if (entries[i].name[0] == 0x00) break;
                 if (entries[i].name[0] == 0xE5) continue;
                 
@@ -757,6 +770,7 @@ void fat32_print_cwd(void) {
 }
 
 static void ls_callback(const char* name, uint8_t attr, uint32_t size, uint32_t cluster) {
+    (void)cluster;
     if (attr & FAT_ATTR_DIRECTORY) print_string("<DIR> ");
     else print_string("      ");
     print_string(name);

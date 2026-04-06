@@ -22,6 +22,25 @@ unsigned char kbd_us_shift[128] = {
     'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 0, '*', 0, ' '
 };
 
+static char kbd_buffer[256];
+static int kbd_head = 0;
+static int kbd_tail = 0;
+
+void kbd_put(char c) {
+    int next = (kbd_head + 1) % 256;
+    if (next != kbd_tail) {
+        kbd_buffer[kbd_head] = c;
+        kbd_head = next;
+    }
+}
+
+char kbd_get() {
+    if (kbd_head == kbd_tail) return 0;
+    char c = kbd_buffer[kbd_tail];
+    kbd_tail = (kbd_tail + 1) % 256;
+    return c;
+}
+
 void keyboard_handler() {
     uint8_t scancode = inb(0x60);
 
@@ -40,7 +59,7 @@ void keyboard_handler() {
         } else {
             char c = shift_pressed ? kbd_us_shift[scancode] : kbd_us[scancode];
             if (caps_lock && c >= 'a' && c <= 'z') c -= 32;
-            if (c > 0) shell_input(c);
+            if (c > 0) kbd_put(c);
         }
     }
     apic_eoi();

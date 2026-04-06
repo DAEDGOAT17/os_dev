@@ -8,8 +8,13 @@ static uint32_t total_memory_kb = 0;
 static uint32_t free_blocks = 0;
 
 uint64_t initrd_brain_start = 0;
-uint64_t initrd_brain_end = 0;
+uint64_t initrd_brain_end   = 0;
 uint8_t  initrd_brain_loaded = 0;
+
+/* Ramdisk: FAT32 disk image embedded in the ISO as a Multiboot2 module */
+uint64_t ramdisk_start  = 0;
+uint64_t ramdisk_size   = 0;
+uint8_t  ramdisk_loaded = 0;
 
 // Symbols from link.ld
 extern uint32_t _kernel_start;
@@ -64,6 +69,31 @@ void pmm_init(uint32_t magic, void* mbd_ptr) {
                            mbd->framebuffer_height, mbd->framebuffer_pitch, 
                            mbd->framebuffer_bpp);
         }
+
+        // Modules (bit 3) — detect embedded ramdisk named "disk"
+        if (mbd->flags & (1 << 3)) {
+            multiboot1_module_t* mods = (multiboot1_module_t*)(uint64_t)mbd->mods_addr;
+            for (uint32_t i = 0; i < mbd->mods_count; i++) {
+                char* str = (char*)(uint64_t)mods[i].string;
+                if (str) {
+                    // Search for "disk" anywhere in the command string
+                    bool found = false;
+                    int len = 0;
+                    while (str[len]) len++;
+                    
+                    for (int j = 0; j <= len - 4; j++) {
+                        if (str[j]=='d' && str[j+1]=='i' && str[j+2]=='s' && str[j+3]=='k') {
+                            found = true; break;
+                        }
+                    }
+                    if (found) {
+                        ramdisk_start  = mods[i].mod_start;
+                        ramdisk_size   = mods[i].mod_end - mods[i].mod_start;
+                        ramdisk_loaded = 1;
+                    }
+                }
+            }
+        }
     } else if (magic == 0x36D76289) {
         // --- Multiboot 2 ---
         // size of the entire mb2 structure is at the first 4 bytes
@@ -106,9 +136,24 @@ void pmm_init(uint32_t magic, void* mbd_ptr) {
                 screen_init_fb(fb_tag->addr, fb_tag->width, fb_tag->height, fb_tag->pitch, fb_tag->bpp);
             } else if (tag->type == 3) { // Module tag
                 multiboot2_module_tag_t* mod_tag = (multiboot2_module_tag_t*)tag;
-                if (mod_tag->string[0] == 'a' && mod_tag->string[1] == 'i') {
+                /* Detect ramdisk: search for "disk" in module string */
+                bool found = false;
+                int len = 0;
+                while (mod_tag->string[len]) len++;
+                
+                for (int j = 0; j <= len - 4; j++) {
+                    if (mod_tag->string[j] == 'd' && mod_tag->string[j+1] == 'i' && 
+                        mod_tag->string[j+2] == 's' && mod_tag->string[j+3] == 'k') {
+                        found = true; break;
+                    }
+                }
+                if (found) {
+                    ramdisk_start  = mod_tag->mod_start;
+                    ramdisk_size   = mod_tag->mod_end - mod_tag->mod_start;
+                    ramdisk_loaded = 1;
+                } else if (mod_tag->string[0] == 'a' && mod_tag->string[1] == 'i') {
                     initrd_brain_start = mod_tag->mod_start;
-                    initrd_brain_end = mod_tag->mod_end;
+                    initrd_brain_end   = mod_tag->mod_end;
                     initrd_brain_loaded = 1;
                 }
             } else if (tag->type == 14 || tag->type == 15) { // ACPI RSDP Tag (old or new)
@@ -138,6 +183,15 @@ void pmm_init(uint32_t magic, void* mbd_ptr) {
         uint32_t mod_start_block = initrd_brain_start / PMM_BLOCK_SIZE;
         uint32_t mod_end_block = (initrd_brain_end + PMM_BLOCK_SIZE - 1) / PMM_BLOCK_SIZE;
         for (uint32_t i = mod_start_block; i <= mod_end_block; i++) {
+            pmm_set_bit(i);
+        }
+    }
+
+    // 6. Protect Ramdisk Memory (don't let allocator overwrite the FAT32 image)
+    if (ramdisk_loaded) {
+        uint32_t rd_start_block = (uint32_t)(ramdisk_start / PMM_BLOCK_SIZE);
+        uint32_t rd_end_block   = (uint32_t)((ramdisk_start + ramdisk_size + PMM_BLOCK_SIZE - 1) / PMM_BLOCK_SIZE);
+        for (uint32_t i = rd_start_block; i <= rd_end_block; i++) {
             pmm_set_bit(i);
         }
     }

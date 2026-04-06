@@ -84,9 +84,22 @@ typedef struct {
     char string[1]; // String starts here
 } __attribute__((packed)) multiboot2_module_tag_t;
 
+/* Multiboot1 module entry (used when booting via Legacy BIOS/Multiboot1) */
+typedef struct {
+    uint32_t mod_start;
+    uint32_t mod_end;
+    uint32_t string;  /* physical addr of null-terminated command string */
+    uint32_t reserved;
+} __attribute__((packed)) multiboot1_module_t;
+
 extern uint64_t initrd_brain_start;
 extern uint64_t initrd_brain_end;
 extern uint8_t  initrd_brain_loaded;
+
+/* Ramdisk (disk.img embedded in ISO as Multiboot2 module named "disk") */
+extern uint64_t ramdisk_start;
+extern uint64_t ramdisk_size;
+extern uint8_t  ramdisk_loaded;
 
 void pmm_init(uint32_t magic, void* mbd);
 void* pmm_alloc_block();
