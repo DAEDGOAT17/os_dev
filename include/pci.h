@@ -10,4 +10,11 @@ uint32_t pci_read_config_dword(uint8_t bus, uint8_t device, uint8_t function, ui
 // Scan the PCI bus and print any Multimedia Audio Controllers (class 0x04, subclass 0x03)
 void pci_scan_multimedia();
 
+// Scan the PCI bus and print SSDs / Storage Controllers (class 0x01)
+void pci_scan_storage();
+
+// Scan the PCI bus and print Network Controllers (class 0x02)
+void pci_scan_network();
+
 #endif
+

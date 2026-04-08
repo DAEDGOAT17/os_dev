@@ -11,12 +11,14 @@
 #include "fat32.h"
 #include "ata.h"
 #include "pmm.h"
-
+#include "ahci.h"
+#include "net_stack.h"
+#include "lwip/netif.h"
 
 char shell_buffer[256];
 int buffer_idx = 0;
 const char* commands[] = {
-    "ls", "cd", "cat", "touch", "write", "rm", "mkdir", "rmdir", "clear", "help", "ps", "mem", "reboot", "sysinfo", "cpuid", "arch", NULL
+    "ls", "cd", "cat", "touch", "write", "rm", "mkdir", "rmdir", "clear", "help", "ps", "mem", "reboot", "sysinfo", "cpuid", "arch", "pci", "ahci", "ifconfig", "ai", "ai_mock", NULL
 };
 
 // Static variables for filename completion state
@@ -25,6 +27,10 @@ static int tc_match_count = 0;
 static char tc_prefix[64];
 static int tc_prefix_len = 0;
 static bool tc_is_dir = false;
+
+// Network Stack Stubs
+int stub_tcp_connect(uint32_t server_ip, uint16_t port);
+int stub_tcp_send(int socket_id, const char* payload);
 
 void tc_callback(const char* name, uint8_t attr, uint32_t size, uint32_t cluster) {
     (void)size;
@@ -49,6 +55,62 @@ void tc_callback(const char* name, uint8_t attr, uint32_t size, uint32_t cluster
             if (tc_is_dir && !(attr & FAT_ATTR_DIRECTORY)) tc_is_dir = false;
         }
         tc_match_count++;
+    }
+}
+
+static void cmd_ifconfig() {
+    set_text_color(MAKE_COLOR(COLOR_LIGHT_CYAN, COLOR_BLACK));
+    print_string("Network Interfaces:\n");
+    print_string("-------------------\n");
+    reset_text_color();
+    
+    // lwIP keeps a global list of initialized hardware interfaces
+    extern struct netif *netif_list;
+    struct netif *n = netif_list;
+    
+    if (!n) {
+        set_text_color(MAKE_COLOR(COLOR_LIGHT_RED, COLOR_BLACK));
+        print_string("No network interfaces detected. Run hardware scan first.\n");
+        reset_text_color();
+        return;
+    }
+    
+    while (n != NULL) {
+        set_text_color(MAKE_COLOR(COLOR_WHITE, COLOR_BLACK));
+        print_string("Interface: ");
+        print_char(n->name[0]);
+        print_char(n->name[1]);
+        print_char('\n');
+        
+        print_string("  IP Address: ");
+        uint32_t ip = n->ip_addr.addr;
+        kprint_dec((ip >> 0) & 0xFF); print_char('.');
+        kprint_dec((ip >> 8) & 0xFF); print_char('.');
+        kprint_dec((ip >> 16) & 0xFF); print_char('.');
+        kprint_dec((ip >> 24) & 0xFF); print_char('\n');
+        
+        print_string("  HW MAC:     ");
+        char* hex = "0123456789ABCDEF";
+        for (int i=0; i < n->hwaddr_len; i++) {
+            print_char(hex[(n->hwaddr[i] >> 4) & 0xF]);
+            print_char(hex[n->hwaddr[i] & 0xF]);
+            if (i < n->hwaddr_len - 1) print_char(':');
+        }
+        
+        print_string("\n  Link MTU:   ");
+        kprint_dec(n->mtu);
+        
+        print_string("\n  State:      ");
+        if (n->flags & NETIF_FLAG_LINK_UP) {
+           set_text_color(MAKE_COLOR(COLOR_LIGHT_GREEN, COLOR_BLACK));
+           print_string("ONLINE (UP)\n");
+        } else {
+           set_text_color(MAKE_COLOR(COLOR_RED, COLOR_BLACK));
+           print_string("OFFLINE (DOWN)\n");
+        }
+        reset_text_color();
+        print_char('\n');
+        n = n->next;
     }
 }
 
@@ -166,6 +228,8 @@ static void cmd_sysinfo() {
     print_string("  Arch         : x86_64 (64-bit)\n");
     print_string("  Boot Method  : GRUB Multiboot2 / UEFI\n");
     print_string("  Paging       : 4-Level (PML4)\n");
+    print_string("  Networking   : lwIP (Bare-Metal TCP/IP Stack)\n");
+    print_string("  AI Shell     : Ollama API Autonomous Intercept\n");
 
     // --- CPU Info ---
     set_text_color(MAKE_COLOR(COLOR_LIGHT_BLUE, COLOR_BLACK));
@@ -374,6 +438,11 @@ void shell_execute(char* cmd) {
         print_string("- sysinfo      (Full system information)\n");
         print_string("- cpuid        (Raw CPU identity report)\n");
         print_string("- arch         (Confirm CPU architecture)\n");
+        print_string("- pci <class>  (Scan PCI bus: storage, network, audio)\n");
+        print_string("- ahci         (Scan for AHCI Storage Controllers)\n");
+        print_string("- ifconfig     (Show lwIP initialized network interfaces)\n");
+        print_string("- ai <prompt>  (Send query to Autonomous Agent via Network)\n");
+        print_string("- ai_mock      (Test Agentic intercept via fake Ollama payload)\n");
         print_string("- reboot       (Restart system)\n\n");
         return;
     }
@@ -419,6 +488,41 @@ void shell_execute(char* cmd) {
     }
     else if (strcmp(cmd, "arch") == 0) {
         cmd_arch();
+        return;
+    }
+    else if (strcmp(cmd, "pci") == 0) {
+        if (!arg) {
+            print_string("Usage: pci <storage|network|audio>\n");
+        } else if (strcmp(arg, "storage") == 0) {
+            pci_scan_storage();
+        } else if (strcmp(arg, "network") == 0) {
+            pci_scan_network();
+        } else if (strcmp(arg, "audio") == 0) {
+            pci_scan_multimedia();
+        } else {
+            print_string("Unknown PCI class. Valid: storage, network, audio\n");
+        }
+        return;
+    }
+    else if (strcmp(cmd, "ahci") == 0) {
+        pci_init_ahci();
+        return;
+    }
+    else if (strcmp(cmd, "ai") == 0) {
+        if (!arg) {
+            print_string("Usage: ai <prompt>\n");
+        } else {
+            print_string("Networking: Connecting to Cognitive Core (AI)...\n");
+            ollama_request(arg);
+        }
+        return;
+    }
+    else if (strcmp(cmd, "ai_mock") == 0) {
+        ollama_mock_intercept();
+        return;
+    }
+    else if (strcmp(cmd, "ifconfig") == 0) {
+        cmd_ifconfig();
         return;
     }
     else {
@@ -551,6 +655,8 @@ void shell_input(char c) {
 }
 
 extern char kbd_get(void);
+extern void rtl8169_poll(void);
+extern void sys_check_timeouts(void);
 
 void shell_task(void) {
     static bool welcomed = false;
@@ -568,6 +674,10 @@ void shell_task(void) {
         reset_text_color();
         welcomed = true;
     }
+
+    // Process background networking hardware loops
+    rtl8169_poll();
+    sys_check_timeouts();
 
     // Process input from buffer (prevents running commands in ISR context)
     char c = kbd_get();

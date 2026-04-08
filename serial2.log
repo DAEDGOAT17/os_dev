@@ -1,0 +1,162 @@
+c[?7l[2J[0mSeaBIOS (version 1.15.0-1)
+
+
+iPXE (https://ipxe.org) 00:03.0 CA00 PCI2.10 PnP PMM+7FF8B4A0+7FECB4A0 CA00
+Press Ctrl-B to configure iPXE (PCI 00:03.0)...                                                                               
+
+
+Booting from DVD/CD...
+[01;01H[2J[02;30HGNU GRUB  version 2.06[04;02H┌────────────────────────────────────────────────────────────────────────────┐[05;02H│[05;79H│[06;02H│[06;79H│[07;02H│[07;79H│[08;02H│[08;79H│[09;02H│[09;79H│[10;02H│[10;79H│[11;02H│[11;79H│[12;02H│[12;79H│[13;02H│[13;79H│[14;02H│[14;79H│[15;02H│[15;79H│[16;02H│[16;79H│[17;02H│[17;79H│[18;02H└────────────────────────────────────────────────────────────────────────────┘[20;02H     Use the ↑ and ↓ keys to select which entry is hi[20;54H[20;55Hghlighted.          
+      Press enter to boot the selected OS, `e' to edit the commands       
+      before booting or `c' for a command-line.                           [05;80H [05;03H[0;30;47m*Jarvis OS (UEFI / BIOS - 64bit)                                            [06;03H[0m Jarvis OS (Legacy BIOS - Multiboot1)                                       [07;03H                                                                            [08;03H                                                                            [09;03H                                                                            [10;03H                                                                            [11;03H                                                                            [12;03H        [12;10H[12;11H                                                                    [13;03H                                                                            [14;03H                                                                            [15;03H                                                                            [16;03H                                                                            [17;03H                [17;18H[17;19H                                                            [17;80H 
+
+
+
+
+
+   The highlighted entry will be executed automatically in 5s.                 [05;78H
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   The highlighted entry will be executed automatically in 4s.                 [05;78H
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   The highlighted entry will be executed automatically in 3s.                 [05;78H
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   T[23;04H[23;05Hhe highlighted entry will be executed automatically in 2s.                 [05;78H
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   The highlighted entry will be executed automatically in 1s.                 [05;78H
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   The highlighted entry will be executed automatically in 0s.                 [01;01H[2J[2JLoading kernel...
+Loading ramdisk...
+error: file `/boot/ra[03;21H[03;22Hmdisk.img' not found.
+Booting...
+MB2 TAG: 21 size=12
+MB2 TAG: 1 size=9
+MB2 TAG: 2 size=29
+MB2 TAG: 10 size=28
+MB2 TAG: 6 size=160
+MB2 TAG: 9 size=1044
+MB2 TAG: 4 size=16
+MB2 TAG: 5 size=20
+MB2 TAG: 7 size=784
+MB2 TAG: 8 size=38
+MB2 TAG: 14 size=28
+MB2 TAG: 0 size=8
+Kernel: Init GDT OK
+Kernel: PMM OK
+Kernel: Init IDT OK
+Kernel: VMM OK
+Kernel: Kmalloc OK
+Kernel: Task OK
+ATA: Detecting storage...
+ATA: No storage detected.
+Kernel: Storage detection failed
+Kernel: Interrupts enabled
+  ###     #    ######  ##   ##  ###  #####
+   #     # #   #    #  ##   ##   #  #     
+   #    #####  ######   ## ##    #   ####  
+   #   #     # #    #    ###     #       # 
+  ###  #     # #    #     #     ###  #####  
+
+  +--------------------------------------------------+
+  |       x86_64 OS Kernel  v1.0  --  64-bit         |
+  +--------------------------------------------------+
+
+  =[ ARCHITECTURE ]==============================
+  CPU Vendor   : AuthenticAMD
+  Mode         : [OK] x86_64  64-Bit Long Mode  ACTIVE
+  Paging       : [OK] 4-Level Paging  PML4->PDPT->PD->PT
+  Interrupts   : [OK] Local APIC + I/O APIC  (Modern)
+
+  =[ SYSTEM ]=====================================
+  RAM          : 2047 MB Physical Memory
+  Heap         : [OK] Dynamic  --  Base: 0x0000000200000000
+  File System  : [!!] No filesystem detected  --  storage commands unavailable
+
+  ================================================
+  >> Type 'help' for commands  |  'sysinfo' for full report
+  ================================================
+
+
+JARVIS OS - Interactive Mode
+Type 'help' for a list of commands.
+
+JARVIS [/] $ 

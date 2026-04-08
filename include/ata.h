@@ -12,6 +12,8 @@
 // ATA I/O port bases
 #define ATA_PRIMARY_BASE    0x1F0
 #define ATA_PRIMARY_CTRL    0x3F6
+#define ATA_SECONDARY_BASE  0x170
+#define ATA_SECONDARY_CTRL  0x376
 
 // ATA Register offsets from base
 #define ATA_REG_DATA        0x00
@@ -40,7 +42,14 @@
 #define ATA_SECTOR_SIZE 512
 
 // Initialize ATA driver - returns 1 if drive found, 0 otherwise
+// Initialize storage. Returns 0 on success, -1 on failure.
 int ata_init(void);
+
+// Get the LBA where a valid FAT32 filesystem was detected (0 for ramdisk or raw disk)
+uint32_t ata_get_partition_offset(void);
+
+// Returns 1 if we are using the internal ramdisk, 0 if using a real drive
+int ata_is_ramdisk(void);
 
 // Read 'count' sectors starting at LBA 'lba' into buffer
 // Returns 0 on success, -1 on error

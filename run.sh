@@ -27,7 +27,7 @@ done
 
 # 3. Compile C Files
 echo "--- Step 3: Compiling C Source ---"
-CC_FLAGS="-mno-red-zone -m64 -c -Iinclude -ffreestanding -O2 -fno-stack-protector -nostdlib -fno-builtin -Wall -Wextra"
+CC_FLAGS="-mno-red-zone -m64 -c -Iinclude -Isrc/net/lwip/src/include -Iinclude/lwip_port -ffreestanding -O2 -fno-stack-protector -nostdlib -fno-builtin -Wall -Wextra"
 find src -name "*.c" | while read -r f; do
     echo "  Compiling $f..."
     gcc $CC_FLAGS "$f" -o "$BUILD_DIR/$(basename "${f%.c}.o")"
@@ -58,7 +58,7 @@ else
 fi
 
 # Switch terminal to graphical mode so UEFI has a console
-terminal_output gfxterm
+terminal_output console
 
 set timeout=5
 set default=0
@@ -66,36 +66,33 @@ set default=0
 menuentry "Jarvis OS (UEFI / BIOS - 64bit)" {
     # Keep the framebuffer GRUB set up; pass GOP info via Multiboot2 tag
     set gfxpayload=keep
+    echo "Loading kernel..."
     multiboot2 /boot/$KERNEL_ELF
-    # Load the embedded FAT32 ramdisk so filesystem commands work on all hardware
+    echo "Loading ramdisk..."
     module2 /boot/ramdisk.img disk
+    echo "Booting..."
+    sleep 3
     boot
 }
 
 menuentry "Jarvis OS (Legacy BIOS - Multiboot1)" {
     # Legacy fallback: let BIOS handle video
     set gfxpayload=text
+    echo "Loading kernel..."
     multiboot /boot/$KERNEL_ELF
-    # Also load the ramdisk so filesystem commands work
+    echo "Loading ramdisk..."
     module /boot/ramdisk.img disk
+    echo "Booting..."
+    sleep 3
     boot
 }
 EOF
 
-# 6. Create Hybrid ISO (BIOS + UEFI)
-echo "--- Step 6: Creating Hybrid ISO ---"
-if command -v grub-mkrescue >/dev/null 2>&1; then
-    grub-mkrescue -o "$ISO_NAME" "$ISO_DIR/"
-else
-    echo "ERROR: grub-mkrescue not found. Cannot create ISO."
-    exit 1
-fi
-
-# 7. Create Embedded FAT32 Ramdisk (64 MB) - loaded into RAM by GRUB at boot
+# 6. Create Embedded FAT32 Ramdisk (34 MB) - loaded into RAM by GRUB at boot
 # This is the filesystem the kernel uses for ls/cat/write/mkdir on all hardware.
-echo "--- Step 7: Creating Embedded FAT32 Ramdisk (64 MB) ---"
+echo "--- Step 6: Creating Embedded FAT32 Ramdisk (34 MB) ---"
 RAMDISK_IMG="ramdisk.img"
-dd if=/dev/zero of="$RAMDISK_IMG" bs=1M count=64 status=none
+dd if=/dev/zero of="$RAMDISK_IMG" bs=1M count=34 status=none
 if command -v mkfs.fat >/dev/null 2>&1; then
     mkfs.fat -F 32 -n JARVISFS "$RAMDISK_IMG" >/dev/null
 else
@@ -115,6 +112,16 @@ fi
 
 # Embed the ramdisk in the ISO so GRUB can load it as a module
 cp "$RAMDISK_IMG" "$ISO_DIR/boot/ramdisk.img"
+
+# 7. Create Hybrid ISO (BIOS + UEFI)
+echo "--- Step 7: Creating Hybrid ISO ---"
+if command -v grub-mkrescue >/dev/null 2>&1; then
+    grub-mkrescue -o "$ISO_NAME" "$ISO_DIR/"
+else
+    echo "ERROR: grub-mkrescue not found. Cannot create ISO."
+    exit 1
+fi
+
 
 # 8. Create Separate Large FAT32 Disk Image for QEMU testing
 echo "--- Step 8: Creating FAT32 Disk Image for QEMU (128 MB) ---"
@@ -165,7 +172,7 @@ echo "-------------------------------------------"
 
 # 8. Run in QEMU (Optional)
 if [[ "$*" == *"--run"* ]]; then
-    QEMU_ARGS="-m 2G -boot d -cdrom $ISO_NAME -drive file=$DISK_IMG,format=raw -serial mon:stdio"
+    QEMU_ARGS="-m 4G -boot d -cdrom $ISO_NAME -drive file=$DISK_IMG,format=raw -serial mon:stdio"
     
     if [[ "$*" == *"--uefi"* ]]; then
         # Find OVMF

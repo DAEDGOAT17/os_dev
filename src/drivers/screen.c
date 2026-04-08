@@ -323,6 +323,7 @@ void scroll_down() {
 }
 
 void print_char(char c) {
+    outb(0x3F8, c);
     if (c == '\b') {
         if (current_col > 0) {
             current_col--;

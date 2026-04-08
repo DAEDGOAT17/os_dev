@@ -8,6 +8,7 @@
 #include "shell.h"
 #include "ata.h"
 #include "fat32.h"
+#include "pci.h"
 // Keep kmain minimal: boot prints general info only
 
 void kmain(uint32_t magic, multiboot_info_t* mbd) {
@@ -36,13 +37,19 @@ void kmain(uint32_t magic, multiboot_info_t* mbd) {
     task_init();
     print_string("Kernel: Task OK\n");
     
+    // Scan for PCI Storage (SSDs)
+    pci_scan_storage();
+    
     // Initialize Filesystem
-    int fs_ok = ata_init();
-    if (fs_ok) {
-        fat32_mount(0);
-        print_string("Kernel: FAT32 OK\n");
+    if (ata_init() == 0) {
+        uint32_t offset = ata_get_partition_offset();
+        if (fat32_mount(offset) == 0) {
+            print_string("Kernel: FAT32 OK\n");
+        } else {
+            print_string("Kernel: FAT32 Mount Fail\n");
+        }
     } else {
-        print_string("Kernel: ATA FAIL - No disk and no ramdisk\n");
+        print_string("Kernel: Storage detection failed\n");
     }
     
     task_create("shell", shell_task, 1);
@@ -120,12 +127,14 @@ void kmain(uint32_t magic, multiboot_info_t* mbd) {
     print_color_string("[OK] Dynamic  --  Base: 0x0000000200000000\n",  MAKE_COLOR(COLOR_LIGHT_GREEN, COLOR_BLACK));
 
     print_color_string("  File System  : ", MAKE_COLOR(COLOR_LIGHT_GREY, COLOR_BLACK));
-    if (fs_ok && ramdisk_loaded)
-        print_color_string("[OK] FAT32  on  RAM Disk (32 MB, resets on reboot)\n", MAKE_COLOR(COLOR_LIGHT_GREEN, COLOR_BLACK));
-    else if (fs_ok)
-        print_color_string("[OK] FAT32  on  ATA Disk\n",                           MAKE_COLOR(COLOR_LIGHT_GREEN, COLOR_BLACK));
-    else
-        print_color_string("[!!] No filesystem  --  disk commands unavailable\n",  MAKE_COLOR(COLOR_RED,         COLOR_BLACK));
+    if (fat32_is_mounted()) {
+        if (ata_is_ramdisk())
+            print_color_string("[OK] FAT32  on  RAM Disk (64 MB, volatile)\n", MAKE_COLOR(COLOR_LIGHT_GREEN, COLOR_BLACK));
+        else
+            print_color_string("[OK] FAT32  on  Physical Drive (MBR/Raw)\n",    MAKE_COLOR(COLOR_LIGHT_GREEN, COLOR_BLACK));
+    } else {
+        print_color_string("[!!] No filesystem detected  --  storage commands unavailable\n",  MAKE_COLOR(COLOR_RED,         COLOR_BLACK));
+    }
 
     print_char('\n');
     print_color_string("  ================================================\n",  MAKE_COLOR(COLOR_LIGHT_BLUE, COLOR_BLACK));

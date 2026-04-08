@@ -103,6 +103,13 @@ void pmm_init(uint32_t magic, void* mbd_ptr) {
         
         while (current_offset < total_size) {
             multiboot2_tag_t* tag = (multiboot2_tag_t*)((uint8_t*)mbd_ptr + current_offset);
+            
+            print_string("MB2 TAG: ");
+            kprint_dec(tag->type);
+            print_string(" size=");
+            kprint_dec(tag->size);
+            print_string("\n");
+            
             if (tag->type == 0) { // End of tags
                 break;
             }
@@ -137,6 +144,10 @@ void pmm_init(uint32_t magic, void* mbd_ptr) {
                 screen_init_fb(fb_tag->addr, fb_tag->width, fb_tag->height, fb_tag->pitch, fb_tag->bpp);
             } else if (tag->type == 3) { // Module tag
                 multiboot2_module_tag_t* mod_tag = (multiboot2_module_tag_t*)tag;
+                print_string("MB2 Mod String: '");
+                print_string(mod_tag->string);
+                print_string("'\n");
+                
                 /* Detect ramdisk: search for "disk" in module string */
                 bool found = false;
                 int len = 0;
@@ -152,6 +163,7 @@ void pmm_init(uint32_t magic, void* mbd_ptr) {
                     ramdisk_start  = mod_tag->mod_start;
                     ramdisk_size   = mod_tag->mod_end - mod_tag->mod_start;
                     ramdisk_loaded = 1;
+                    print_string(" -> Ramdisk loaded successfully\n");
                 } else if (mod_tag->string[0] == 'a' && mod_tag->string[1] == 'i') {
                     initrd_brain_start = mod_tag->mod_start;
                     initrd_brain_end   = mod_tag->mod_end;
