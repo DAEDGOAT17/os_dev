@@ -1,0 +1,57 @@
+./test_uefi_console.sh: line 4: cd: /home/deadgoat/Jarwis: No such file or directory
+Testing UEFI boot with kernel output...
+
+[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00003 " from PciRoot(0x0)/Pci(0x1,0x1)/Ata(Secondary,Master,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00003 " from PciRoot(0x0)/Pci(0x1,0x1)/Ata(Secondary,Master,0x0)
+MB2 TAG: 21 size=12
+MB2 TAG: 1 size=9
+MB2 TAG: 2 size=30
+MB2 TAG: 6 size=448
+MB2 TAG: 9 size=1044
+MB2 TAG: 4 size=16
+MB2 TAG: 8 size=38
+MB2 TAG: 12 size=16
+MB2 TAG: 14 size=28
+MB2 TAG: 15 size=44
+MB2 TAG: 17 size=6400
+MB2 TAG: 0 size=8
+Kernel: Init GDT OK
+Kernel: PMM OK
+Kernel: Init IDT OK
+Kernel: VMM OK
+Kernel: Kmalloc OK
+Kernel: Task OK
+ATA: Detecting storage...
+ATA: No storage detected.
+Kernel: Storage detection failed
+Kernel: Interrupts enabled
+  ###     #    ######  ##   ##  ###  #####
+   #     # #   #    #  ##   ##   #  #     
+   #    #####  ######   ## ##    #   ####  
+   #   #     # #    #    ###     #       # 
+  ###  #     # #    #     #     ###  #####  
+
+  +--------------------------------------------------+
+  |       x86_64 OS Kernel  v1.0  --  64-bit         |
+  +--------------------------------------------------+
+
+  =[ ARCHITECTURE ]==============================
+  CPU Vendor   : AuthenticAMD
+  Mode         : [OK] x86_64  64-Bit Long Mode  ACTIVE
+  Paging       : [OK] 4-Level Paging  PML4->PDPT->PD->PT
+  Interrupts   : [OK] Local APIC + I/O APIC  (Modern)
+
+  =[ SYSTEM ]=====================================
+  RAM          : 250 MB Physical Memory
+  Heap         : [OK] Dynamic  --  Base: 0x0000000200000000
+  File System  : [!!] No filesystem detected  --  storage commands unavailable
+
+  ================================================
+  >> Type 'help' for commands  |  'sysinfo' for full report
+  ================================================
+
+
+JARVIS OS - Interactive Mode
+Type 'help' for a list of commands.
+
+JARVIS [/] $ 
