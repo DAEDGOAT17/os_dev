@@ -9,11 +9,6 @@ Jarvis OS is a custom 64-bit bare-metal operating system built entirely from scr
 * **Description:** A highly respected implementation of the TCP/IP stack specifically designed for embedded systems that lack an RTOS (Real-Time Operating System). 
 * **Our Usage:** We use the core `lwIP` state machines (compiled strictly with `NO_SYS=1` and overriding `ctype.h`) to handle IPv4, ARP, and TCP sliding windows instead of manually crafting packet sequence ACKs. The network hooks directly into our `pci.c` detected Realtek RTL8169 DMA rings.
 
-### 2. llm.c (Andrej Karpathy's LLM Engine)
-* **License:** MIT License
-* **Description:** A pure-C, minimal implementation for training and inferencing LLMs like GPT-2 and LLaMA without heavy Python or PyTorch dependencies.
-* **Our Usage:** Architecturally adopted to run the Transformer multi-head attention and weight loading mechanism securely against our native Physical Memory Manager (`pmm.c`), effectively making AI capabilities a native Ring-0 kernel service.
-
 ### 3. FAT32 Reference Implementations
 * **Description:** The structural definitions (`bpb_t`, Root Directory layouts) utilized in `fat32.c` and `gpt.c` are derived from the foundational EFI configuration specs originally established by Microsoft.
 
