@@ -181,6 +181,16 @@ err_t rtl8169_linkoutput(struct netif *netif, struct pbuf *p) {
         tx_len = 60;
     }
     
+    // Ensure CPU is looking at the actual memory to check OWN bit
+    flush_cache_line(&tx_ring[tx_idx]);
+    asm volatile("mfence" ::: "memory");
+    
+    if (tx_ring[tx_idx].command & 0x80000000) {
+        // Hardware still owns this descriptor (Ring Full)
+        return ERR_BUF;
+    }
+
+    
     rtl8169_last_tx_len = tx_len;
     for (int i = 0; i < tx_len; i++) {
         rtl8169_last_tx_packet[i] = flat_buf[i];
@@ -207,6 +217,9 @@ err_t rtl8169_linkoutput(struct netif *netif, struct pbuf *p) {
     // FLUSH THE DESCRIPTOR COMMAND so the Network Card can see the OWN bit!
     flush_cache_line(&tx_ring[tx_idx]);
     
+    // Ensure all memory writes and cache flushes hit RAM before we ring the doorbell!
+    asm volatile("mfence" ::: "memory");
+    
     // Write 0x40 to TPPOLL to tell hardware memory is ready
     rtl_outb(RTL_TPPOLL, 0x40);
     
@@ -224,6 +237,7 @@ void rtl8169_poll(void) {
     while (1) {
         // Force the CPU to fetch from RAM instead of L1 Cache before reading the descriptor!
         flush_cache_line(&rx_ring[rx_idx]);
+        asm volatile("mfence" ::: "memory");
         
         uint32_t cmd = rx_ring[rx_idx].command;
         if (cmd & RTL_DESC_OWN) {
@@ -266,6 +280,7 @@ void rtl8169_poll(void) {
         if (rx_idx == NUM_DESCS - 1) reset_cmd |= 0x40000000; // Ring wrap marker
         rx_ring[rx_idx].command = reset_cmd;
         flush_cache_line(&rx_ring[rx_idx]);
+        asm volatile("mfence" ::: "memory");
         
         rx_idx = (rx_idx + 1) % NUM_DESCS;
     }
@@ -444,20 +459,18 @@ void rtl8169_init(uint32_t bus, uint32_t device, uint32_t function) {
         }
     }
     
-    // Step 5: Mount hardware into software network stack!
+    // Mount hardware into software network stack using Static IP
+    // Note: Aligned to the 172.16.100.x subnet seen in your packet capture
     lwip_init();
     ip4_addr_t ipaddr, netmask, gw;
     
-    // STATIC IP (Since you are directly connected to Windows without a router!)
-    IP4_ADDR(&ipaddr, 192, 168, 1, 50); 
+    IP4_ADDR(&ipaddr, 172, 16, 100, 50); 
     IP4_ADDR(&netmask, 255, 255, 255, 0);
-    IP4_ADDR(&gw, 192, 168, 1, 100);
+    IP4_ADDR(&gw, 172, 16, 100, 1);
 
     netif_add(&rtl_netif, &ipaddr, &netmask, &gw, NULL, rtl8169_netif_init, netif_input);
     netif_set_default(&rtl_netif);
     netif_set_up(&rtl_netif);
 
-    // dhcp_start(&rtl_netif); <-- Disabled! There is no router to give us an IP!
-    
-    print_string("RTL8169: lwIP Bound to Hardware! Static IP set to 192.168.1.50\n");
+    print_string("RTL8169: lwIP Bound to Hardware! Static IP set to 172.16.100.50\n");
 }

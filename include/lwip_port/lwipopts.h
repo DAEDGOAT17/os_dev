@@ -20,6 +20,7 @@
 #define LWIP_ICMP 1
 #define LWIP_UDP 1
 #define LWIP_TCP 1
+#define LWIP_RAW 1
 #define LWIP_DHCP 1 // Enable DHCP for dynamic IP assignment
 #define LWIP_DNS 0
 #define LWIP_NETCONN 0 // Requires RTOS
