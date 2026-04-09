@@ -3,6 +3,7 @@
 #include "lwip/init.h"
 #include "lwip/netif.h"
 #include "lwip/etharp.h"
+#include "lwip/dhcp.h"
 
 static struct netif qemu_netif;
 
@@ -31,16 +32,25 @@ static err_t dummy_netif_init(struct netif *netif) {
 }
 
 void qemu_net_init() {
+    static int is_initialized = 0;
+    if (is_initialized) {
+        print_string("QEMU E1000: Already initialized. Skipping to avoid lwIP crashes.\n");
+        return;
+    }
+    is_initialized = 1;
+
     print_string("QEMU E1000: Found Virtual NIC. Initializing lwIP Mock Bridge...\n");
     lwip_init();
     ip4_addr_t ipaddr, netmask, gw;
-    IP4_ADDR(&ipaddr, 192, 168, 1, 100);    
-    IP4_ADDR(&netmask, 255, 255, 255, 0);
-    IP4_ADDR(&gw, 192, 168, 1, 1);
+    IP4_ADDR(&ipaddr, 0, 0, 0, 0);    
+    IP4_ADDR(&netmask, 0, 0, 0, 0);
+    IP4_ADDR(&gw, 0, 0, 0, 0);
     
     netif_add(&qemu_netif, &ipaddr, &netmask, &gw, NULL, dummy_netif_init, netif_input);
     netif_set_default(&qemu_netif);
     netif_set_up(&qemu_netif);
+
+    dhcp_start(&qemu_netif);
     
-    print_string("QEMU E1000: lwIP Bound to Mock Hardware! Subnet: 192.168.1.100\n");
+    print_string("QEMU E1000: lwIP Bound to Mock Hardware! DHCP Discovery in progress...\n");
 }

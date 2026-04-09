@@ -8,6 +8,7 @@
 #include "lwip/netif.h"
 #include "lwip/etharp.h"
 #include "lwip/pbuf.h"
+#include "lwip/dhcp.h"
 
 // Track the memory mapped I/O base
 static uint8_t *mmio_base = 0;
@@ -36,6 +37,11 @@ static void rtl_outd(uint8_t reg, uint32_t val) {
 static struct netif rtl_netif;
 static int tx_idx = 0;
 
+uint32_t rtl8169_tx_packets = 0;
+uint32_t rtl8169_rx_packets = 0;
+uint32_t rtl8169_tx_bytes = 0;
+uint32_t rtl8169_rx_bytes = 0;
+
 err_t rtl8169_linkoutput(struct netif *netif, struct pbuf *p) {
     (void)netif;
     if (!tx_ring) return ERR_IF;
@@ -57,6 +63,9 @@ err_t rtl8169_linkoutput(struct netif *netif, struct pbuf *p) {
     // Write 0x40 to TPPOLL to tell hardware memory is ready
     rtl_outb(RTL_TPPOLL, 0x40);
     
+    rtl8169_tx_packets++;
+    rtl8169_tx_bytes += p->tot_len;
+    
     tx_idx = (tx_idx + 1) % NUM_DESCS;
     return ERR_OK;
 }
@@ -71,6 +80,9 @@ void rtl8169_poll(void) {
         int len = cmd & 0x3FFF; // Extract packet length from lower 14 bits
         
         if (len > 0 && len <= 1536) {
+            rtl8169_rx_packets++;
+            rtl8169_rx_bytes += len;
+            
             // Allocate a packet buffer for lwIP
             struct pbuf *p = pbuf_alloc(PBUF_RAW, len, PBUF_POOL);
             if (p != NULL) {
@@ -109,6 +121,13 @@ err_t rtl8169_netif_init(struct netif *netif) {
 }
 
 void rtl8169_init(uint32_t bus, uint32_t device, uint32_t function) {
+    static int is_initialized = 0;
+    if (is_initialized) {
+        print_string("RTL8169: Already initialized. Skipping to avoid lwIP crashes.\n");
+        return;
+    }
+    is_initialized = 1;
+
     print_string("RTL8169: Initializing hardware...\n");
     
     // Read BAR2 (Offset 0x18) or BAR0 (Offset 0x10) to find MMIO space.
@@ -174,7 +193,9 @@ void rtl8169_init(uint32_t bus, uint32_t device, uint32_t function) {
     }
 
     // Step 4: Enable Receiver (RE) and Transmitter (TE)
-    print_string("RTL8169: Enabling RX/TX logic...\n");
+    print_string("RTL8169: Configuring RX Filters & Enabling RX/TX logic...\n");
+    // RCR: Accept Physical Match (0x02) | Accept Multicast (0x04) | Accept Broadcast (0x08)
+    rtl_outd(RTL_RCR, 0x0E);
     rtl_outb(RTL_COMMAND, RTL_CMD_RE | RTL_CMD_TE);
 
     print_string("RTL8169: Hardware Initialization Complete. Bootstrapping lwIP...\n");
@@ -182,13 +203,15 @@ void rtl8169_init(uint32_t bus, uint32_t device, uint32_t function) {
     // Step 5: Mount hardware into software network stack!
     lwip_init();
     ip4_addr_t ipaddr, netmask, gw;
-    IP4_ADDR(&ipaddr, 192, 168, 1, 100);    // Hardcoded IP for OS Network slice
-    IP4_ADDR(&netmask, 255, 255, 255, 0);
-    IP4_ADDR(&gw, 192, 168, 1, 1);
+    IP4_ADDR(&ipaddr, 0, 0, 0, 0);
+    IP4_ADDR(&netmask, 0, 0, 0, 0);
+    IP4_ADDR(&gw, 0, 0, 0, 0);
     
     netif_add(&rtl_netif, &ipaddr, &netmask, &gw, NULL, rtl8169_netif_init, netif_input);
     netif_set_default(&rtl_netif);
     netif_set_up(&rtl_netif);
+
+    dhcp_start(&rtl_netif);
     
-    print_string("RTL8169: lwIP Bound to Hardware! Subnet: 192.168.1.100\n");
+    print_string("RTL8169: lwIP Bound to Hardware! DHCP Discovery in progress...\n");
 }

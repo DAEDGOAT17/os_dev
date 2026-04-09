@@ -3,11 +3,13 @@
 #include "string.h"
 #include "lwip/tcp.h"
 #include "lwip/ip_addr.h"
+#include "lwip/ip4_addr.h"
 
 // Will expose shell_execute for autonomous callback hooks
 extern void shell_execute(char* cmd);
 
 static char global_prompt[256];
+static char global_ip_str[32];
 
 // Helper to calculate Content-Length
 static void itoa(int n, char s[]) {
@@ -104,7 +106,9 @@ static err_t ollama_connected_cb(void *arg, struct tcp_pcb *tpcb, err_t err) {
     
     char request[1024];
     strcpy(request, "POST /api/generate HTTP/1.1\r\n");
-    strcat(request, "Host: 192.168.1.50:11434\r\n");
+    strcat(request, "Host: ");
+    strcat(request, global_ip_str);
+    strcat(request, ":11434\r\n");
     strcat(request, "Content-Type: application/json\r\n");
     strcat(request, "Content-Length: ");
     strcat(request, len_str);
@@ -116,18 +120,24 @@ static err_t ollama_connected_cb(void *arg, struct tcp_pcb *tpcb, err_t err) {
     return ERR_OK;
 }
 
-void ollama_request(const char* prompt) {
+void ollama_request(const char* ip_str, const char* prompt) {
     int len = strlen(prompt);
     if (len > 255) len = 255;
     strncpy(global_prompt, prompt, len);
     global_prompt[len] = '\0';
     
+    strncpy(global_ip_str, ip_str, 31);
+    global_ip_str[31] = '\0';
+    
     struct tcp_pcb *pcb = tcp_new();
     if (!pcb) { print_string("Network: Out of memory for Socket.\n"); return; }
     
     ip4_addr_t server;
-    // Adjust to Host Address Assuming 192.168.1.50 hosts Ollama
-    IP4_ADDR(&server, 192, 168, 1, 50);
+    if (!ip4addr_aton(ip_str, &server)) {
+        print_string("Network: Invalid IP address format!\n");
+        tcp_close(pcb);
+        return;
+    }
     
     tcp_recv(pcb, ollama_recv_cb);
     err_t err = tcp_connect(pcb, &server, 11434, ollama_connected_cb);

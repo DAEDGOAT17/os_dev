@@ -18,7 +18,7 @@
 char shell_buffer[256];
 int buffer_idx = 0;
 const char* commands[] = {
-    "ls", "cd", "cat", "touch", "write", "rm", "mkdir", "rmdir", "clear", "help", "ps", "mem", "reboot", "sysinfo", "cpuid", "arch", "pci", "ahci", "ifconfig", "ai", "ai_mock", NULL
+    "ls", "cd", "cat", "touch", "write", "rm", "mkdir", "rmdir", "clear", "help", "ps", "mem", "reboot", "sysinfo", "cpuid", "arch", "pci", "ahci", "ifconfig", "netstat", "ai", "ai_mock", NULL
 };
 
 // Static variables for filename completion state
@@ -112,6 +112,30 @@ static void cmd_ifconfig() {
         print_char('\n');
         n = n->next;
     }
+}
+
+static void cmd_netstat() {
+    extern uint32_t rtl8169_tx_packets;
+    extern uint32_t rtl8169_rx_packets;
+    extern uint32_t rtl8169_tx_bytes;
+    extern uint32_t rtl8169_rx_bytes;
+
+    set_text_color(MAKE_COLOR(COLOR_LIGHT_CYAN, COLOR_BLACK));
+    print_string("Network Statistics (RTL8169):\n");
+    print_string("-----------------------------\n");
+    reset_text_color();
+
+    print_string("TX Packets: ");
+    kprint_dec(rtl8169_tx_packets);
+    print_string(" (");
+    kprint_dec(rtl8169_tx_bytes);
+    print_string(" bytes)\n");
+
+    print_string("RX Packets: ");
+    kprint_dec(rtl8169_rx_packets);
+    print_string(" (");
+    kprint_dec(rtl8169_rx_bytes);
+    print_string(" bytes)\n");
 }
 
 static void cmd_cpuid() {
@@ -441,7 +465,8 @@ void shell_execute(char* cmd) {
         print_string("- pci <class>  (Scan PCI bus: storage, network, audio)\n");
         print_string("- ahci         (Scan for AHCI Storage Controllers)\n");
         print_string("- ifconfig     (Show lwIP initialized network interfaces)\n");
-        print_string("- ai <prompt>  (Send query to Autonomous Agent via Network)\n");
+        print_string("- netstat      (Show network usage statistics)\n");
+        print_string("- ai <ip> <p>  (Send query to Autonomous Agent via Network)\n");
         print_string("- ai_mock      (Test Agentic intercept via fake Ollama payload)\n");
         print_string("- reboot       (Restart system)\n\n");
         return;
@@ -510,10 +535,25 @@ void shell_execute(char* cmd) {
     }
     else if (strcmp(cmd, "ai") == 0) {
         if (!arg) {
-            print_string("Usage: ai <prompt>\n");
+            print_string("Usage: ai <ip> <prompt>\n");
         } else {
-            print_string("Networking: Connecting to Cognitive Core (AI)...\n");
-            ollama_request(arg);
+            char* space = strstr(arg, " ");
+            if (space) {
+                *space = '\0';
+                char* ip_str = arg;
+                char* prompt = space + 1;
+                while (*prompt == ' ') prompt++;
+                if (*prompt == '\0') {
+                    print_string("Usage: ai <ip> <prompt>\n");
+                    return;
+                }
+                print_string("Networking: Connecting to Cognitive Core (AI) at ");
+                print_string(ip_str);
+                print_string("...\n");
+                ollama_request(ip_str, prompt);
+            } else {
+                print_string("Usage: ai <ip> <prompt>\n");
+            }
         }
         return;
     }
@@ -523,6 +563,10 @@ void shell_execute(char* cmd) {
     }
     else if (strcmp(cmd, "ifconfig") == 0) {
         cmd_ifconfig();
+        return;
+    }
+    else if (strcmp(cmd, "netstat") == 0) {
+        cmd_netstat();
         return;
     }
     else {

@@ -40,6 +40,9 @@ void kmain(uint32_t magic, multiboot_info_t* mbd) {
     // Scan for PCI Storage (SSDs)
     pci_scan_storage();
     
+    // Scan for PCI Network Controllers and Initialize TCP/IP
+    pci_scan_network();
+    
     // Initialize Filesystem
     if (ata_init() == 0) {
         uint32_t offset = ata_get_partition_offset();
