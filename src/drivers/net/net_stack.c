@@ -8,6 +8,9 @@
 // Will expose shell_execute for autonomous callback hooks
 extern void shell_execute(char* cmd);
 
+// *** CHANGE THIS to match the exact output of 'ollama list' on your server ***
+#define OLLAMA_MODEL "phi3:latest"
+
 static char global_prompt[256];
 static char global_ip_str[32];
 
@@ -23,6 +26,20 @@ static void itoa(int n, char s[]) {
     }
 }
 
+// Decode a \uXXXX Unicode escape sequence into a single char (ASCII only)
+static char decode_unicode_escape(const char* p) {
+    // p points to the 4 hex digits after \u
+    unsigned int val = 0;
+    for (int i = 0; i < 4; i++) {
+        val <<= 4;
+        char c = p[i];
+        if (c >= '0' && c <= '9') val |= (c - '0');
+        else if (c >= 'a' && c <= 'f') val |= (c - 'a' + 10);
+        else if (c >= 'A' && c <= 'F') val |= (c - 'A' + 10);
+    }
+    return (char)(val & 0x7F); // ASCII only
+}
+
 void ollama_parse_json(char* payload) {
     char* resp = strstr(payload, "\"response\":\"");
     if (resp) {
@@ -35,17 +52,58 @@ void ollama_parse_json(char* payload) {
         int catching = 0;
         
         while (*resp && *resp != '\"') {
+            // Handle \uXXXX Unicode escapes (e.g. \u003c = '<', \u003e = '>')
+            if (*resp == '\\' && *(resp+1) == 'u' &&
+                *(resp+2) && *(resp+3) && *(resp+4) && *(resp+5)) {
+                char decoded = decode_unicode_escape(resp + 2);
+                resp += 6; // consume \uXXXX
+                // Now treat 'decoded' as the current character
+                if (decoded == '<') {
+                    // Check for EXEC_CMD tag
+                    if (resp[0]=='E' && resp[1]=='X' && resp[2]=='E' &&
+                        resp[3]=='C' && resp[4]=='_' && resp[5]=='C' &&
+                        resp[6]=='M' && resp[7]=='D' && resp[8]==':') {
+                        catching = 1;
+                        resp += 9; // Skip EXEC_CMD:
+                    } else {
+                        if (catching) intercept_cmd[intercept_idx++] = decoded;
+                        else print_char(decoded);
+                    }
+                } else if (decoded == '>' && catching) {
+                    catching = 0;
+                    intercept_cmd[intercept_idx] = '\0';
+                    intercept_idx = 0;
+                    set_text_color(MAKE_COLOR(COLOR_LIGHT_CYAN, COLOR_BLACK));
+                    print_string("\n[System: AI Agent Executing Autonomous Task: `");
+                    print_string(intercept_cmd);
+                    print_string("`]\n");
+                    reset_text_color();
+                    shell_execute(intercept_cmd);
+                    set_text_color(MAKE_COLOR(COLOR_LIGHT_MAGENTA, COLOR_BLACK));
+                } else {
+                    if (catching) intercept_cmd[intercept_idx++] = decoded;
+                    else print_char(decoded);
+                }
+                continue;
+            }
+
+            // Handle \n literal escape
             if (*resp == '\\' && *(resp+1) == 'n') {
                 print_char('\n');
                 resp += 2;
                 continue;
-            } else if (*resp == '<' && *(resp+1) == 'E' && *(resp+2) == 'X') {
+            }
+
+            // Handle literal < (fallback if model sends raw angle brackets)
+            if (*resp == '<' && *(resp+1) == 'E' && *(resp+2) == 'X') {
                 catching = 1;
                 resp += 10; // Skip <EXEC_CMD:
                 continue;
-            } else if (catching && *resp == '>') {
+            }
+            if (catching && *resp == '>') {
                 catching = 0;
                 intercept_cmd[intercept_idx] = '\0';
+                intercept_idx = 0;
                 set_text_color(MAKE_COLOR(COLOR_LIGHT_CYAN, COLOR_BLACK));
                 print_string("\n[System: AI Agent Executing Autonomous Task: `");
                 print_string(intercept_cmd);
@@ -95,7 +153,7 @@ static err_t ollama_recv_cb(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err
 
 void ollama_mock_intercept() {
     print_string("Simulating AI Server Network Response...\n");
-    char* test_payload = "HTTP/1.1 200 OK\r\n\r\n{\"model\":\"llama3\",\"response\":\"I have investigated your hardware state. I will now autonomously scan the PCI bus for you.\\n<EXEC_CMD:pci storage>\"}";
+    char* test_payload = "HTTP/1.1 200 OK\r\n\r\n{\"model\":\"" OLLAMA_MODEL "\",\"response\":\"I have investigated your hardware state. I will now autonomously scan the PCI bus for you.\\n<EXEC_CMD:pci storage>\"}";
     ollama_parse_json(test_payload);
 }
 
@@ -103,10 +161,10 @@ static err_t ollama_connected_cb(void *arg, struct tcp_pcb *tpcb, err_t err) {
     (void)arg;
     if (err != ERR_OK) return err;
     
-    print_string("Network: Connected! Assembling JSON & Streaming...\n");
+    print_string("Network: Connected! Using model: " OLLAMA_MODEL "\n");
     
     char json_body[512];
-    strcpy(json_body, "{\"model\": \"llama3\", \"prompt\": \"You are the core intelligence of Jarvis OS. Memory is stable. You can control this terminal. Wrap OS commands in <EXEC_CMD:command>. User says: ");
+    strcpy(json_body, "{\"model\": \"" OLLAMA_MODEL "\", \"prompt\": \"You are the core intelligence of Jarvis OS. Memory is stable. You can control this terminal. Wrap OS commands in <EXEC_CMD:command>. User says: ");
     strcat(json_body, global_prompt);
     strcat(json_body, "\", \"stream\": false}");
     
@@ -119,6 +177,7 @@ static err_t ollama_connected_cb(void *arg, struct tcp_pcb *tpcb, err_t err) {
     strcat(request, global_ip_str);
     strcat(request, ":11434\r\n");
     strcat(request, "Content-Type: application/json\r\n");
+    strcat(request, "Connection: close\r\n");       // CRITICAL: tells server not to wait for more data
     strcat(request, "Content-Length: ");
     strcat(request, len_str);
     strcat(request, "\r\n\r\n");
