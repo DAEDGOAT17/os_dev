@@ -6,6 +6,7 @@
 #include <stdbool.h>
 
 static bool shift_pressed = false;
+static bool ctrl_pressed = false;
 static bool caps_lock = false;
 
 unsigned char kbd_us[128] = {
@@ -47,9 +48,12 @@ void keyboard_handler() {
     if (scancode & 0x80) {
         uint8_t released = scancode & 0x7F;
         if (released == 0x2A || released == 0x36) shift_pressed = false;
+        if (released == 0x1D) ctrl_pressed = false;
     } else {
         if (scancode == 0x2A || scancode == 0x36) {
             shift_pressed = true;
+        } else if (scancode == 0x1D) {
+            ctrl_pressed = true;
         } else if (scancode == 0x3A) {
             caps_lock = !caps_lock;
         } else if (scancode == 0x49) { // Page Up
@@ -57,11 +61,14 @@ void keyboard_handler() {
         } else if (scancode == 0x51) { // Page Down
             scroll_down();
         } else {
-            char c = shift_pressed ? kbd_us_shift[scancode] : kbd_us[scancode];
-            if (caps_lock && c >= 'a' && c <= 'z') c -= 32;
-            if (c > 0) kbd_put(c);
+            if (ctrl_pressed && scancode == 0x2E) { // Ctrl + C
+                kbd_put(0x03); // ASCII ETX (End of Text)
+            } else {
+                char c = shift_pressed ? kbd_us_shift[scancode] : kbd_us[scancode];
+                if (caps_lock && c >= 'a' && c <= 'z') c -= 32;
+                if (c > 0) kbd_put(c);
+            }
         }
     }
     apic_eoi();
 }
-

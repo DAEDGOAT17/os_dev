@@ -18,7 +18,7 @@
 char shell_buffer[256];
 int buffer_idx = 0;
 const char* commands[] = {
-    "ls", "cd", "cat", "touch", "write", "rm", "mkdir", "rmdir", "clear", "help", "ps", "mem", "reboot", "sysinfo", "cpuid", "arch", "pci", "ahci", "ifconfig", "netstat", "ai", "ai_mock", NULL
+    "ls", "cd", "cat", "touch", "write", "rm", "mkdir", "rmdir", "clear", "help", "ps", "mem", "reboot", "sysinfo", "cpuid", "arch", "pci", "ahci", "ifconfig", "netstat", "ai", "ai_mock", "pktdump", "ping", NULL
 };
 
 // Static variables for filename completion state
@@ -120,6 +120,11 @@ static void cmd_netstat() {
     extern uint32_t rtl8169_tx_bytes;
     extern uint32_t rtl8169_rx_bytes;
 
+    extern uint32_t e1000_tx_packets;
+    extern uint32_t e1000_rx_packets;
+    extern uint32_t e1000_tx_bytes;
+    extern uint32_t e1000_rx_bytes;
+
     set_text_color(MAKE_COLOR(COLOR_LIGHT_CYAN, COLOR_BLACK));
     print_string("Network Statistics (RTL8169):\n");
     print_string("-----------------------------\n");
@@ -135,7 +140,78 @@ static void cmd_netstat() {
     kprint_dec(rtl8169_rx_packets);
     print_string(" (");
     kprint_dec(rtl8169_rx_bytes);
+    print_string(" bytes)\n\n");
+
+    set_text_color(MAKE_COLOR(COLOR_LIGHT_CYAN, COLOR_BLACK));
+    print_string("Network Statistics (QEMU E1000 Mock):\n");
+    print_string("-------------------------------------\n");
+    reset_text_color();
+
+    print_string("TX Packets: ");
+    kprint_dec(e1000_tx_packets);
+    print_string(" (");
+    kprint_dec(e1000_tx_bytes);
     print_string(" bytes)\n");
+
+    print_string("RX Packets: ");
+    kprint_dec(e1000_rx_packets);
+    print_string(" (");
+    kprint_dec(e1000_rx_bytes);
+    print_string(" bytes)\n");
+}
+
+extern uint8_t rtl8169_last_tx_packet[];
+extern uint16_t rtl8169_last_tx_len;
+extern uint8_t rtl8169_last_rx_packet[];
+extern uint16_t rtl8169_last_rx_len;
+
+void ping_request(const char* ip_str);
+
+static void cmd_pktdump() {
+    char* hex = "0123456789ABCDEF";
+    extern void rtl8169_print_packet_parsed(uint8_t* data, int len);
+
+    set_text_color(MAKE_COLOR(COLOR_LIGHT_CYAN, COLOR_BLACK));
+    print_string("Last RTL8169 TX Packet (");
+    kprint_dec(rtl8169_last_tx_len);
+    print_string(" bytes):\n");
+    print_string("------------------------------------------------\n");
+    reset_text_color();
+
+    if (rtl8169_last_tx_len > 0) {
+        rtl8169_print_packet_parsed(rtl8169_last_tx_packet, rtl8169_last_tx_len);
+    }
+
+    for (int i = 0; i < rtl8169_last_tx_len; i++) {
+        print_char(hex[(rtl8169_last_tx_packet[i] >> 4) & 0xF]);
+        print_char(hex[rtl8169_last_tx_packet[i] & 0xF]);
+        print_char(' ');
+        if ((i + 1) % 16 == 0) print_char('\n');
+    }
+    if (rtl8169_last_tx_len == 0) print_string("None.\n");
+    else if (rtl8169_last_tx_len % 16 != 0) print_char('\n');
+
+    print_char('\n');
+
+    set_text_color(MAKE_COLOR(COLOR_LIGHT_CYAN, COLOR_BLACK));
+    print_string("Last RTL8169 RX Packet (");
+    kprint_dec(rtl8169_last_rx_len);
+    print_string(" bytes):\n");
+    print_string("------------------------------------------------\n");
+    reset_text_color();
+
+    if (rtl8169_last_rx_len > 0) {
+        rtl8169_print_packet_parsed(rtl8169_last_rx_packet, rtl8169_last_rx_len);
+    }
+
+    for (int i = 0; i < rtl8169_last_rx_len; i++) {
+        print_char(hex[(rtl8169_last_rx_packet[i] >> 4) & 0xF]);
+        print_char(hex[rtl8169_last_rx_packet[i] & 0xF]);
+        print_char(' ');
+        if ((i + 1) % 16 == 0) print_char('\n');
+    }
+    if (rtl8169_last_rx_len == 0) print_string("None.\n");
+    else if (rtl8169_last_rx_len % 16 != 0) print_char('\n');
 }
 
 static void cmd_cpuid() {
@@ -466,8 +542,10 @@ void shell_execute(char* cmd) {
         print_string("- ahci         (Scan for AHCI Storage Controllers)\n");
         print_string("- ifconfig     (Show lwIP initialized network interfaces)\n");
         print_string("- netstat      (Show network usage statistics)\n");
+        print_string("- ping <ip>    (Send ICMP Echo Request)\n");
         print_string("- ai <ip> <p>  (Send query to Autonomous Agent via Network)\n");
         print_string("- ai_mock      (Test Agentic intercept via fake Ollama payload)\n");
+        print_string("- pktdump [on|off] (Hex dump of last packet, or toggle live stream)\n");
         print_string("- reboot       (Restart system)\n\n");
         return;
     }
@@ -569,6 +647,35 @@ void shell_execute(char* cmd) {
         cmd_netstat();
         return;
     }
+    else if (strcmp(cmd, "ping") == 0) {
+        if (!arg) {
+            print_string("Usage: ping <ip>\n");
+        } else {
+            extern void ping_request(const char* ip_str);
+            ping_request(arg);
+        }
+        return;
+    }
+    else if (strcmp(cmd, "pktdump") == 0) {
+        if (!arg) {
+            cmd_pktdump();
+        } else if (strcmp(arg, "on") == 0) {
+            extern int rtl8169_live_pktdump;
+            rtl8169_live_pktdump = 1;
+            set_text_color(MAKE_COLOR(COLOR_LIGHT_GREEN, COLOR_BLACK));
+            print_string("Live continuous packet dump ENABLED.\n");
+            reset_text_color();
+        } else if (strcmp(arg, "off") == 0) {
+            extern int rtl8169_live_pktdump;
+            rtl8169_live_pktdump = 0;
+            set_text_color(MAKE_COLOR(COLOR_RED, COLOR_BLACK));
+            print_string("Live continuous packet dump DISABLED.\n");
+            reset_text_color();
+        } else {
+            print_string("Usage: pktdump [on|off]\n");
+        }
+        return;
+    }
     else {
         print_string("Unknown command. Type 'help' for assistance.\n");
     }
@@ -576,6 +683,27 @@ void shell_execute(char* cmd) {
 
 //shell input function
 void shell_input(char c) {
+    if (c == 0x03) { // Ctrl + C (ASCII ETX)
+        set_text_color(MAKE_COLOR(COLOR_LIGHT_RED, COLOR_BLACK));
+        print_string("^C\n");
+        reset_text_color();
+        buffer_idx = 0;
+        shell_buffer[0] = '\0';
+        
+        // Reset any live streams
+        extern int rtl8169_live_pktdump;
+        rtl8169_live_pktdump = 0;
+
+        set_text_color(MAKE_COLOR(COLOR_LIGHT_GREEN, COLOR_BLACK));
+        print_string("JARVIS [");
+        set_text_color(MAKE_COLOR(COLOR_LIGHT_BLUE, COLOR_BLACK));
+        fat32_print_cwd();
+        set_text_color(MAKE_COLOR(COLOR_LIGHT_GREEN, COLOR_BLACK));
+        print_string("] $ ");
+        reset_text_color();
+        return;
+    }
+
     if (c == '\n') {
         shell_buffer[buffer_idx] = '\0';
         print_char('\n');

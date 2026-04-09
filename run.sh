@@ -170,9 +170,8 @@ fi
 
 echo "-------------------------------------------"
 
-# 8. Run in QEMU (Optional)
 if [[ "$*" == *"--run"* ]]; then
-    QEMU_ARGS="-m 4G -boot d -cdrom $ISO_NAME -drive file=$DISK_IMG,format=raw -serial mon:stdio"
+    QEMU_ARGS="-m 4G -boot d -cdrom $ISO_NAME -drive file=$DISK_IMG,format=raw -serial mon:stdio -netdev user,id=n0 -device rtl8169,netdev=n0"
     
     if [[ "$*" == *"--uefi"* ]]; then
         # Find OVMF

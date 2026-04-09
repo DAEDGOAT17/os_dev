@@ -18,5 +18,6 @@ void ollama_mock_intercept(void);
 
 extern tcp_socket_t active_sockets[8];
 void net_stack_receive(uint8_t* packet, uint32_t len);
+void ping_request(const char* ip_str);
 
 #endif

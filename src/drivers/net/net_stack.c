@@ -68,6 +68,8 @@ void ollama_parse_json(char* payload) {
     }
 }
 
+static char rx_tcp_buffer[4096];
+
 static err_t ollama_recv_cb(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
     (void)arg;
     (void)err;
@@ -77,7 +79,14 @@ static err_t ollama_recv_cb(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err
         return ERR_OK;
     }
     
-    ollama_parse_json((char*)p->payload);
+    // Safely copy payload to a null-terminated buffer before parsing
+    int copy_len = p->tot_len;
+    if (copy_len > 4095) copy_len = 4095;
+    
+    pbuf_copy_partial(p, rx_tcp_buffer, copy_len, 0);
+    rx_tcp_buffer[copy_len] = '\0';
+    
+    ollama_parse_json(rx_tcp_buffer);
     
     tcp_recved(tpcb, p->tot_len);
     pbuf_free(p);
@@ -147,3 +156,80 @@ void ollama_request(const char* ip_str, const char* prompt) {
         tcp_close(pcb);
     }
 }
+
+// --- ICMP PING IMPLEMENTATION ---
+#include "lwip/raw.h"
+#include "lwip/icmp.h"
+#include "lwip/inet_chksum.h"
+#include "timer.h"
+
+static struct raw_pcb *ping_pcb = NULL;
+static uint32_t ping_start_time = 0;
+static ip4_addr_t ping_target;
+
+static u8_t ping_recv_cb(void *arg, struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *addr) {
+    (void)arg;
+    (void)pcb;
+    
+    if (p->tot_len >= sizeof(struct icmp_echo_hdr)) {
+        struct icmp_echo_hdr *iecho = (struct icmp_echo_hdr *)p->payload;
+        if (iecho->type == ICMP_ER) { // Echo Reply
+            uint32_t end_time = timer_get_ticks();
+            uint32_t rtt = (end_time - ping_start_time) * 10; // Assuming 100Hz PIT = 10ms per tick
+            
+            print_string("64 bytes from ");
+            print_string(ip4addr_ntoa(ip_2_ip4(addr)));
+            print_string(": icmp_seq=");
+            kprint_dec(lwip_ntohs(iecho->seqno));
+            print_string(" time=");
+            kprint_dec(rtt);
+            print_string("ms\n");
+            
+            pbuf_free(p);
+            return 1; // Ate it
+        }
+    }
+    return 0; // Didn't eat it
+}
+
+void ping_request(const char* ip_str) {
+    if (!ip4addr_aton(ip_str, &ping_target)) {
+        print_string("Ping: Invalid IP address.\n");
+        return;
+    }
+
+    if (!ping_pcb) {
+        ping_pcb = raw_new(IP_PROTO_ICMP);
+        if (!ping_pcb) {
+            print_string("Ping: Could not create RAW PCB.\n");
+            return;
+        }
+        raw_recv(ping_pcb, ping_recv_cb, NULL);
+        raw_bind(ping_pcb, IP4_ADDR_ANY);
+    }
+
+    struct pbuf *p = pbuf_alloc(PBUF_IP, sizeof(struct icmp_echo_hdr), PBUF_RAM);
+    if (!p) {
+        print_string("Ping: Out of memory for pbuf.\n");
+        return;
+    }
+
+    struct icmp_echo_hdr *iecho = (struct icmp_echo_hdr *)p->payload;
+    ICMPH_TYPE_SET(iecho, ICMP_ECHO);
+    ICMPH_CODE_SET(iecho, 0);
+    iecho->chksum = 0;
+    iecho->id = lwip_htons(0xBEEF);
+    iecho->seqno = lwip_htons(1);
+    iecho->chksum = inet_chksum(iecho, p->len);
+
+    print_string("PING ");
+    print_string(ip_str);
+    print_string(" (");
+    print_string(ip_str);
+    print_string("): 56 data bytes\n");
+
+    ping_start_time = timer_get_ticks();
+    raw_sendto(ping_pcb, p, (ip_addr_t *)&ping_target);
+    pbuf_free(p);
+}
+

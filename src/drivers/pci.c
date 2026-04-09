@@ -20,6 +20,17 @@ uint32_t pci_read_config_dword(uint8_t bus, uint8_t device, uint8_t function, ui
     return data;
 }
 
+void pci_write_config_dword(uint8_t bus, uint8_t device, uint8_t function, uint8_t offset, uint32_t value) {
+    uint32_t address;
+    uint32_t lbus = (uint32_t)bus;
+    uint32_t ldevice = (uint32_t)device;
+    uint32_t lfunc = (uint32_t)function;
+
+    address = (uint32_t)((1U << 31) | (lbus << 16) | (ldevice << 11) | (lfunc << 8) | (offset & 0xFC));
+    outl(PCI_CONFIG_ADDRESS, address);
+    outl(PCI_CONFIG_DATA, value);
+}
+
 void pci_scan_multimedia() {
     print_string("PCI: Scanning for Multimedia Audio Controllers...\n");
     for (uint32_t bus = 0; bus < 256; ++bus) {

@@ -4,6 +4,15 @@
 #include "lwip/netif.h"
 #include "lwip/etharp.h"
 #include "lwip/dhcp.h"
+#include "string.h"
+
+#define MAX_DUMP_SIZE 1514
+uint8_t e1000_last_tx_packet[MAX_DUMP_SIZE];
+uint16_t e1000_last_tx_len = 0;
+uint32_t e1000_tx_packets = 0;
+uint32_t e1000_tx_bytes = 0;
+uint32_t e1000_rx_packets = 0;
+uint32_t e1000_rx_bytes = 0;
 
 static struct netif qemu_netif;
 
@@ -15,6 +24,21 @@ static err_t dummy_linkoutput(struct netif *netif, struct pbuf *p) {
     kprint_dec(p->tot_len);
     print_string(" bytes.\nJARVIS [/] $ ");
     reset_text_color();
+
+    struct pbuf *q;
+    int offset = 0;
+    for (q = p; q != NULL && offset < MAX_DUMP_SIZE; q = q->next) {
+        int copy_len = q->len;
+        if (offset + copy_len > MAX_DUMP_SIZE) {
+            copy_len = MAX_DUMP_SIZE - offset;
+        }
+        memcpy(e1000_last_tx_packet + offset, q->payload, copy_len);
+        offset += copy_len;
+    }
+    e1000_last_tx_len = offset;
+    e1000_tx_packets++;
+    e1000_tx_bytes += p->tot_len;
+
     return ERR_OK;
 }
 
