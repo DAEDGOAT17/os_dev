@@ -629,6 +629,9 @@ void shell_execute(char* cmd) {
                 print_string(ip_str);
                 print_string("...\n");
                 ollama_request(ip_str, prompt);
+                // The timer IRQ (100 Hz) now drives rtl8169_poll() and
+                // sys_check_timeouts() every 10 ms — no spin-poll needed here.
+                print_string("Network: Request queued. Waiting for Ollama response...\n");
             } else {
                 print_string("Usage: ai <ip> <prompt>\n");
             }
@@ -827,8 +830,6 @@ void shell_input(char c) {
 }
 
 extern char kbd_get(void);
-extern void rtl8169_poll(void);
-extern void sys_check_timeouts(void);
 
 void shell_task(void) {
     static bool welcomed = false;
@@ -847,9 +848,8 @@ void shell_task(void) {
         welcomed = true;
     }
 
-    // Process background networking hardware loops
-    rtl8169_poll();
-    sys_check_timeouts();
+    // Process background networking hardware loops are now handled by the
+    // timer IRQ (timer_handler() at 100 Hz). No manual poll needed here.
 
     // Process input from buffer (prevents running commands in ISR context)
     char c = kbd_get();

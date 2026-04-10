@@ -4,6 +4,7 @@
 #include "screen.h"
 #include "kmalloc.h"
 #include "net.h"
+#include "timer.h"
 #include "lwip/init.h"
 #include "lwip/netif.h"
 #include "lwip/etharp.h"
@@ -473,4 +474,11 @@ void rtl8169_init(uint32_t bus, uint32_t device, uint32_t function) {
     netif_set_up(&rtl_netif);
 
     print_string("RTL8169: lwIP Bound to Hardware! Static IP set to 172.16.100.50\n");
+
+    // Enable timer-IRQ-driven network polling now that lwIP is fully initialized.
+    // From this point the timer handler calls rtl8169_poll() + sys_check_timeouts()
+    // every 10 ms — unconditionally, regardless of what the shell task is doing.
+    // This is what prevents TCP retransmit backoff from ballooning to ~2 minutes.
+    timer_set_net_ready();
+    print_string("RTL8169: Timer-driven RX poll ACTIVE (10 ms interval).\n");
 }

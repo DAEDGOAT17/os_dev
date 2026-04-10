@@ -16,6 +16,10 @@ rm -rf "$BUILD_DIR" "$ISO_DIR"
 mkdir -p "$BUILD_DIR"
 mkdir -p "$ISO_DIR/boot/grub"
 
+# Remove stale ISOs from old naming convention (aos.iso / aos_uefi.iso).
+# These were generated when ISO_NAME was 'aos.iso'; now we use 'jarvis.iso'.
+rm -f aos.iso aos_uefi.iso
+
 # 2. Assemble Assembly Files (x86_64)
 echo "--- Step 2: Assembling x86_64 ASM ---"
 for f in src/arch/x86_64/asm/*.s; do

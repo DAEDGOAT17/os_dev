@@ -18,4 +18,8 @@ void timer_get_uptime(uint32_t* hours, uint32_t* minutes, uint32_t* seconds);
 // Timer interrupt handler (called from assembly)
 void timer_handler();
 
+// Call this once after the NIC + lwIP are fully initialized.
+// Enables network polling from within the timer IRQ (every 10 ms).
+void timer_set_net_ready(void);
+
 #endif

@@ -9,6 +9,7 @@
 #include "ata.h"
 #include "fat32.h"
 #include "pci.h"
+#include "timer.h"
 // Keep kmain minimal: boot prints general info only
 
 void kmain(uint32_t magic, multiboot_info_t* mbd) {
@@ -20,6 +21,13 @@ void kmain(uint32_t magic, multiboot_info_t* mbd) {
     
     // Now init IDT
     init_idt();
+    
+    // Initialize PIT at 100 Hz (10ms per tick) BEFORE enabling interrupts.
+    // This is CRITICAL for lwIP: sys_now() returns timer_get_ticks() * 10.
+    // Without this, PIT defaults to ~18.2 Hz (BIOS default), making lwIP's
+    // clock run ~5.5x slow and causing TCP retransmit timeouts to balloon
+    // from ~1 second to ~6 seconds each — with exponential backoff = ~2 min!
+    timer_init(100);
     
     // Map framebuffer and identity map everything needed
     vmm_init();

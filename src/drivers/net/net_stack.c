@@ -4,6 +4,8 @@
 #include "lwip/tcp.h"
 #include "lwip/ip_addr.h"
 #include "lwip/ip4_addr.h"
+#include "lwip/etharp.h"
+#include "lwip/netif.h"
 
 // Will expose shell_execute for autonomous callback hooks
 extern void shell_execute(char* cmd);
@@ -159,7 +161,12 @@ void ollama_mock_intercept() {
 
 static err_t ollama_connected_cb(void *arg, struct tcp_pcb *tpcb, err_t err) {
     (void)arg;
-    if (err != ERR_OK) return err;
+    if (err != ERR_OK) {
+        print_string("Network: Connection to Ollama FAILED (err=");
+        kprint_dec((int)err);
+        print_string(").\nJARVIS [/] $ ");
+        return err;
+    }
     
     print_string("Network: Connected! Using model: " OLLAMA_MODEL "\n");
     
@@ -188,6 +195,14 @@ static err_t ollama_connected_cb(void *arg, struct tcp_pcb *tpcb, err_t err) {
     return ERR_OK;
 }
 
+// Error callback — called by lwIP when a TCP connection is aborted or reset
+static void ollama_err_cb(void *arg, err_t err) {
+    (void)arg;
+    print_string("\nNetwork: TCP connection error (err=");
+    kprint_dec((int)err);
+    print_string(") — Ollama unreachable or connection reset.\nJARVIS [/] $ ");
+}
+
 void ollama_request(const char* ip_str, const char* prompt) {
     int len = strlen(prompt);
     if (len > 255) len = 255;
@@ -206,8 +221,26 @@ void ollama_request(const char* ip_str, const char* prompt) {
         tcp_close(pcb);
         return;
     }
+
+    // --- ARP Pre-warm ---
+    // Sending etharp_query() BEFORE tcp_connect() forces lwIP to immediately
+    // send an ARP request for the server's MAC. The shell_task() poll loop
+    // will process the ARP reply in the next few milliseconds, so that by
+    // the time tcp_connect() fires its SYN, the ARP table is already populated
+    // and the SYN goes out immediately on the wire instead of being queued
+    // behind an ARP round-trip.
+    extern struct netif *netif_default;
+    if (netif_default) {
+        ip_addr_t server_ipaddr;
+        ip_addr_copy_from_ip4(server_ipaddr, server);
+        etharp_query(netif_default, ip_2_ip4(&server_ipaddr), NULL);
+        print_string("Network: ARP pre-warm sent for ");
+        print_string(ip_str);
+        print_string("\n");
+    }
     
     tcp_recv(pcb, ollama_recv_cb);
+    tcp_err(pcb, ollama_err_cb);   // Register error callback to catch refused/reset connections
     err_t err = tcp_connect(pcb, &server, 11434, ollama_connected_cb);
     
     if (err != ERR_OK) {
