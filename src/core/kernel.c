@@ -56,6 +56,11 @@ void kmain(uint32_t magic, multiboot_info_t* mbd) {
         uint32_t offset = ata_get_partition_offset();
         if (fat32_mount(offset) == 0) {
             print_string("Kernel: FAT32 OK\n");
+            
+            // Initialize the Agentic Context DB
+            extern void agent_init(void);
+            agent_init();
+            print_string("Kernel: Agent DB OK\n");
         } else {
             print_string("Kernel: FAT32 Mount Fail\n");
         }

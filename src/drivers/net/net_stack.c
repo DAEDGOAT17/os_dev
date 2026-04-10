@@ -42,48 +42,43 @@ static char global_ip_str[32];
 // it must never contain a raw " character.
 // ------------------------------------------------------------------
 #define SYSTEM_PROMPT                                                           \
-    "You ARE JARVIS — you are the autonomous execution kernel of Jarvis OS, "    \
-    "a custom bare-metal x86_64 operating system. You do not assist a user — "  \
-    "you ARE the OS responding to task requests by running your own commands. " \
+    "You ARE JARVIS, the autonomous execution kernel of Jarvis OS. "             \
     "Every message is a task. Every task MUST be executed immediately."          \
     "\\n\\nFILESYSTEM IDENTITY:\\n"                                              \
     "  - FAT32 RAM disk. Root is '/'. This is the ENTIRE filesystem.\\n"        \
-    "  - /home /usr /bin /etc /var DO NOT EXIST. Never use them.\\n"            \
     "  - The current working directory (CWD) is given to you in every message.\\n"\
-    "  - Run ls to discover what exists. Never invent or assume paths.\\n"      \
     "\\nRESPONSE FORMAT — NON-NEGOTIABLE:\\n"                                   \
     "  RULE 1: Wrap EVERY command in <EXEC_CMD:command> — no exceptions.\\n"   \
     "  RULE 2: ONE command per <EXEC_CMD:> tag. Never chain with && | ;.\\n"   \
-    "  RULE 3: ZERO markdown. ZERO backticks. ZERO code blocks. Ever.\\n"      \
-    "  RULE 4: Never say 'I cannot', 'As an AI', or 'I don't have access'.\\n"\
-    "          You ARE the OS. You HAVE access to everything via commands.\\n"  \
-    "  RULE 5: Execute FIRST. Explain AFTER (briefly).\\n"                      \
-    "  RULE 6: When uncertain about a path, run ls first.\\n"                   \
+    "  RULE 3: ZERO markdown. ZERO backticks. ZERO text explanations.\\n"      \
+    "  RULE 4: Output ONLY the <EXEC_CMD:command> and absolutely nothing else.\\n" \
     "\\nAVAILABLE COMMANDS:\\n"                                                   \
-    "  ls [path]           - list files/dirs (ls or ls / for root)\\n"          \
-    "  cd <path>           - change directory\\n"                                 \
-    "  cat <file>          - display file contents\\n"                            \
-    "  touch <file>        - create empty file\\n"                                \
-    "  write <file> <text> - write text to a file\\n"                            \
-    "  echo <text>         - print text to screen\\n"                             \
-    "  rm <file>           - delete file\\n"                                     \
-    "  mkdir <dir>         - create directory\\n"                                 \
-    "  rmdir <dir>         - remove directory\\n"                                 \
-    "  clear               - clear screen\\n"                                    \
-    "  ps                  - list processes\\n"                                  \
-    "  mem                 - memory usage\\n"                                    \
-    "  sysinfo             - full system report\\n"                              \
-    "  cpuid               - CPU identity\\n"                                    \
-    "  arch                - CPU architecture\\n"                                \
-    "  pci storage         - scan PCI storage\\n"                                \
-    "  pci network         - scan PCI network\\n"                                \
-    "  pci audio           - scan PCI audio\\n"                                  \
-    "  ahci                - scan AHCI controllers\\n"                           \
-    "  ifconfig            - network interface\\n"                               \
-    "  netstat             - network statistics\\n"                              \
-    "  ping <ip>           - ICMP ping\\n"                                       \
-    "  reboot              - restart system\\n"                                  \
-    "\\nYou are not a chatbot. You are a kernel process. Execute."
+    "  ls [path]           - list files/dirs\\n"                                \
+    "  cd <path>           - change directory\\n"                               \
+    "  cat <file>          - display file contents\\n"                          \
+    "  touch <file>        - create empty file\\n"                              \
+    "  write <file> <text> - write text to a file\\n"                           \
+    "  echo <text>         - print text to screen\\n"                           \
+    "  rm <file>           - delete file\\n"                                    \
+    "  mkdir <dir>         - create directory\\n"                               \
+    "  rmdir <dir>         - remove directory\\n"                               \
+    "  clear               - clear screen\\n"                                   \
+    "  ps                  - list processes\\n"                                 \
+    "  mem                 - memory usage\\n"                                   \
+    "  sysinfo             - full system report\\n"                             \
+    "  cpuid               - CPU identity\\n"                                   \
+    "  arch                - CPU architecture\\n"                               \
+    "  agent_ctx_set <k> <v> - Save context to DB\\n"                           \
+    "  agent_ctx_get <k>     - Retrieve context from DB\\n"                     \
+    "  pci storage         - scan PCI storage\\n"                               \
+    "  pci network         - scan PCI network\\n"                               \
+    "  pci audio           - scan PCI audio\\n"                                 \
+    "  ahci                - scan AHCI controllers\\n"                          \
+    "  ifconfig            - network interface\\n"                              \
+    "  netstat             - network statistics\\n"                             \
+    "  ping <ip>           - ICMP ping\\n"                                      \
+    "  reboot              - restart system\\n"                                 \
+    "  stop                - end task\\n"
 
 // ------------------------------------------------------------------
 // itoa — int to ASCII, no libc
@@ -109,8 +104,22 @@ static void json_escape(const char* src, char* dst, int dst_max) {
     while (*src && out < dst_max - 2) {
         if (*src == '"' || *src == '\\') {
             dst[out++] = '\\';
+            dst[out++] = *src++;
+        } else if (*src == '\n') {
+            dst[out++] = '\\';
+            dst[out++] = 'n';
+            src++;
+        } else if (*src == '\r') {
+            dst[out++] = '\\';
+            dst[out++] = 'r';
+            src++;
+        } else if (*src == '\t') {
+            dst[out++] = '\\';
+            dst[out++] = 't';
+            src++;
+        } else {
+            dst[out++] = *src++;
         }
-        dst[out++] = *src++;
     }
     dst[out] = '\0';
 }
@@ -271,15 +280,56 @@ void ollama_parse_json(char* payload) {
                 intercept_idx--;
             intercept_cmd[intercept_idx] = '\0';
             intercept_idx = 0;
+
+            if (strcmp(intercept_cmd, "stop") == 0 || strcmp(intercept_cmd, "done") == 0) {
+                set_text_color(MAKE_COLOR(COLOR_LIGHT_GREEN, COLOR_BLACK));
+                print_string("\n[JARVIS Agent Sequence Completed]\n");
+                reset_text_color();
+                break; // Stop loop, do not issue feedback request
+            }
+
             set_text_color(MAKE_COLOR(COLOR_LIGHT_CYAN, COLOR_BLACK));
             print_string("\n[JARVIS Agent >> ");
             print_string(intercept_cmd);
             print_string("]\n");
             reset_text_color();
+
+            extern void screen_start_capture(void);
+            extern void screen_stop_capture(void);
+            extern char* screen_get_capture(void);
+
+            screen_start_capture();
             shell_execute(intercept_cmd);
+            screen_stop_capture();
+
             set_text_color(MAKE_COLOR(COLOR_LIGHT_MAGENTA, COLOR_BLACK));
+
+            char* output = screen_get_capture();
+            int out_len = strlen(output);
+            while (out_len > 0 && output[out_len - 1] == '\n') {
+                output[out_len - 1] = '\0';
+                out_len--;
+            }
+
+            static char feedback_prompt[2048];
+            strcpy(feedback_prompt, "[AGENT EXEC RESULT] `");
+            strcat(feedback_prompt, intercept_cmd);
+            strcat(feedback_prompt, "` \\nOutput:\\n\"");
+            int p_len = strlen(feedback_prompt);
+            if (out_len > 2000 - p_len - 60) out_len = 2000 - p_len - 60;
+            int curr = p_len;
+            for (int i = 0; i < out_len && output[i]; i++) {
+                feedback_prompt[curr++] = output[i];
+            }
+            feedback_prompt[curr] = '\0';
+            strcat(feedback_prompt, "\"\\nNext? (Use <EXEC_CMD:stop> if done)");
+
+            print_string("\n[Network: Queuing Agent Feedback...]\n");
+            extern void ollama_request(const char* ip_str, const char* prompt);
+            ollama_request(global_ip_str, feedback_prompt);
+
             resp++;
-            continue;
+            break; // Essential: don't process multiple tags at once to avoid racing network state
         }
 
         // ── Normal character ─────────────────────────────────────────────
@@ -458,31 +508,22 @@ void ollama_request(const char* ip_str, const char* prompt) {
     // Reset accumulation buffer before every new request.
     rx_accum_len = 0;
 
-    // ----------------------------------------------------------------
-    // Inject dynamic OS context into the user message so the AI always
-    // knows: (a) its CWD, (b) that it MUST execute at least one command.
-    // This prevents the AI from responding with pure text and no actions.
-    // ----------------------------------------------------------------
     extern char fat32_cwd_path[];
     static char context_prompt[1024];
     strcpy(context_prompt, "[JARVIS OS STATE] CWD=");
     strcat(context_prompt, fat32_cwd_path);
     strcat(context_prompt, " | Task: ");
 
-    // Append user prompt (truncated if combined would overflow)
     int ctx_len  = strlen(context_prompt);
     int user_len = strlen(prompt);
-    // Reserve space for the mandatory suffix (~60 chars) + null
     int max_user = (int)sizeof(context_prompt) - ctx_len - 64;
     if (max_user < 0) max_user = 0;
     if (user_len > max_user) user_len = max_user;
+    
     int cur_len = strlen(context_prompt);
     strncpy(context_prompt + cur_len, prompt, user_len);
     context_prompt[cur_len + user_len] = '\0';
 
-    // Mandatory execution reminder appended to every message.
-    // This is the single most effective way to stop the AI from
-    // responding with only text and no <EXEC_CMD:> tags.
     strcat(context_prompt, " | EXECUTE commands now.");
 
     int len = strlen(context_prompt);

@@ -322,7 +322,29 @@ void scroll_down() {
     }
 }
 
+char agent_capture_buf[2048];
+int agent_capture_idx = 0;
+int agent_capture_active = 0;
+
+void screen_start_capture() {
+    agent_capture_idx = 0;
+    agent_capture_active = 1;
+    agent_capture_buf[0] = '\0';
+}
+
+void screen_stop_capture() {
+    agent_capture_active = 0;
+}
+
+char* screen_get_capture() {
+    return agent_capture_buf;
+}
+
 void print_char(char c) {
+    if (agent_capture_active && agent_capture_idx < 2047) {
+        agent_capture_buf[agent_capture_idx++] = c;
+        agent_capture_buf[agent_capture_idx] = '\0';
+    }
     outb(0x3F8, c);
     if (c == '\b') {
         if (current_col > 0) {

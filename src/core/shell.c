@@ -18,7 +18,7 @@
 char shell_buffer[256];
 int buffer_idx = 0;
 const char* commands[] = {
-    "ls", "cd", "cat", "touch", "write", "rm", "mkdir", "rmdir", "clear", "echo", "help", "ps", "mem", "reboot", "sysinfo", "cpuid", "arch", "pci", "ahci", "ifconfig", "netstat", "ai", "ai_mock", "pktdump", "ping", NULL
+    "ls", "cd", "cat", "touch", "write", "rm", "mkdir", "rmdir", "clear", "echo", "help", "ps", "mem", "reboot", "sysinfo", "cpuid", "arch", "pci", "ahci", "ifconfig", "netstat", "ai", "ai_mock", "pktdump", "ping", "agent_ctx_set", "agent_ctx_get", "agent_task", NULL
 };
 
 // Static variables for filename completion state
@@ -662,6 +662,32 @@ void shell_execute(char* cmd) {
             extern void ping_request(const char* ip_str);
             ping_request(arg);
         }
+        return;
+    }
+    else if (strcmp(cmd, "agent_ctx_set") == 0) {
+        if (!arg) { print_string("Usage: agent_ctx_set <key> <value>\n"); return; }
+        char* space = strstr(arg, " ");
+        if (space) {
+            *space = '\0';
+            char* key = arg;
+            char* value = space + 1;
+            extern void agent_ctx_set(const char* k, const char* v);
+            agent_ctx_set(key, value);
+        } else {
+            print_string("Usage: agent_ctx_set <key> <value>\n");
+        }
+        return;
+    }
+    else if (strcmp(cmd, "agent_ctx_get") == 0) {
+        if (!arg) { print_string("Usage: agent_ctx_get <key>\n"); return; }
+        extern void agent_ctx_get(const char* k);
+        agent_ctx_get(arg);
+        return;
+    }
+    else if (strcmp(cmd, "agent_task") == 0) {
+        if (!arg) { print_string("Usage: agent_task <instruction>\n"); return; }
+        extern void agent_task(const char* inst);
+        agent_task(arg);
         return;
     }
     else if (strcmp(cmd, "pktdump") == 0) {
