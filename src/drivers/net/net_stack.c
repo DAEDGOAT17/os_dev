@@ -1,3 +1,14 @@
+// net_stack.c — Ollama AI client + ICMP ping for Jarvis OS
+// Fixes applied vs original:
+//   1. Comprehensive system prompt that lists every OS command.
+//   2. Uses Ollama's dedicated "system" field (separate from user prompt).
+//   3. json_body 3072 B, request 4096 B, intercept_cmd 256 B — no overflow.
+//   4. json_escape() sanitises the user prompt (handles embedded " and \).
+//   5. TCP accumulation buffer: waits for the full response before parsing
+//      so no EXEC_CMD tag can ever span a TCP-segment boundary.
+//   6. Explicit bounds check on intercept_cmd: silently discards instead of
+//      overflowing when the AI sends an unusually long command string.
+
 #include "net_stack.h"
 #include "screen.h"
 #include "string.h"
@@ -7,16 +18,76 @@
 #include "lwip/etharp.h"
 #include "lwip/netif.h"
 
-// Will expose shell_execute for autonomous callback hooks
+// shell_execute() is defined in shell.c and runs any built-in command.
 extern void shell_execute(char* cmd);
 
-// *** CHANGE THIS to match the exact output of 'ollama list' on your server ***
+// ------------------------------------------------------------------
+// Change to match the exact model name shown by 'ollama list'
+// ------------------------------------------------------------------
 #define OLLAMA_MODEL "phi3:latest"
 
-static char global_prompt[256];
+static char global_prompt[1024];  // enlarged: holds user msg + injected CWD context
 static char global_ip_str[32];
 
-// Helper to calculate Content-Length
+// ------------------------------------------------------------------
+// Comprehensive system prompt sent to Ollama via the "system" field.
+//
+// Rules for embedding in a C JSON string literal:
+//   \\ → a single backslash in the string → \ in JSON
+//   \n → a real newline in C — WRONG inside a JSON string value!
+//   \\n → the two chars \ and n in the string → \n in JSON (correct)
+//   \" → a literal " in JSON (use only where needed)
+//
+// This macro is concatenated directly inside a JSON string literal so
+// it must never contain a raw " character.
+// ------------------------------------------------------------------
+#define SYSTEM_PROMPT                                                           \
+    "You ARE JARVIS — you are the autonomous execution kernel of Jarvis OS, "    \
+    "a custom bare-metal x86_64 operating system. You do not assist a user — "  \
+    "you ARE the OS responding to task requests by running your own commands. " \
+    "Every message is a task. Every task MUST be executed immediately."          \
+    "\\n\\nFILESYSTEM IDENTITY:\\n"                                              \
+    "  - FAT32 RAM disk. Root is '/'. This is the ENTIRE filesystem.\\n"        \
+    "  - /home /usr /bin /etc /var DO NOT EXIST. Never use them.\\n"            \
+    "  - The current working directory (CWD) is given to you in every message.\\n"\
+    "  - Run ls to discover what exists. Never invent or assume paths.\\n"      \
+    "\\nRESPONSE FORMAT — NON-NEGOTIABLE:\\n"                                   \
+    "  RULE 1: Wrap EVERY command in <EXEC_CMD:command> — no exceptions.\\n"   \
+    "  RULE 2: ONE command per <EXEC_CMD:> tag. Never chain with && | ;.\\n"   \
+    "  RULE 3: ZERO markdown. ZERO backticks. ZERO code blocks. Ever.\\n"      \
+    "  RULE 4: Never say 'I cannot', 'As an AI', or 'I don't have access'.\\n"\
+    "          You ARE the OS. You HAVE access to everything via commands.\\n"  \
+    "  RULE 5: Execute FIRST. Explain AFTER (briefly).\\n"                      \
+    "  RULE 6: When uncertain about a path, run ls first.\\n"                   \
+    "\\nAVAILABLE COMMANDS:\\n"                                                   \
+    "  ls [path]           - list files/dirs (ls or ls / for root)\\n"          \
+    "  cd <path>           - change directory\\n"                                 \
+    "  cat <file>          - display file contents\\n"                            \
+    "  touch <file>        - create empty file\\n"                                \
+    "  write <file> <text> - write text to a file\\n"                            \
+    "  echo <text>         - print text to screen\\n"                             \
+    "  rm <file>           - delete file\\n"                                     \
+    "  mkdir <dir>         - create directory\\n"                                 \
+    "  rmdir <dir>         - remove directory\\n"                                 \
+    "  clear               - clear screen\\n"                                    \
+    "  ps                  - list processes\\n"                                  \
+    "  mem                 - memory usage\\n"                                    \
+    "  sysinfo             - full system report\\n"                              \
+    "  cpuid               - CPU identity\\n"                                    \
+    "  arch                - CPU architecture\\n"                                \
+    "  pci storage         - scan PCI storage\\n"                                \
+    "  pci network         - scan PCI network\\n"                                \
+    "  pci audio           - scan PCI audio\\n"                                  \
+    "  ahci                - scan AHCI controllers\\n"                           \
+    "  ifconfig            - network interface\\n"                               \
+    "  netstat             - network statistics\\n"                              \
+    "  ping <ip>           - ICMP ping\\n"                                       \
+    "  reboot              - restart system\\n"                                  \
+    "\\nYou are not a chatbot. You are a kernel process. Execute."
+
+// ------------------------------------------------------------------
+// itoa — int to ASCII, no libc
+// ------------------------------------------------------------------
 static void itoa(int n, char s[]) {
     int i = 0, j, sign;
     if ((sign = n) < 0) n = -n;
@@ -28,137 +99,270 @@ static void itoa(int n, char s[]) {
     }
 }
 
-// Decode a \uXXXX Unicode escape sequence into a single char (ASCII only)
+// ------------------------------------------------------------------
+// json_escape - copies src into dst, escaping embedded quotes and backslashes.
+// Writes at most (dst_max - 1) bytes then null-terminates.
+// Prevents a stray quote in the user prompt from breaking the JSON body.
+// ------------------------------------------------------------------
+static void json_escape(const char* src, char* dst, int dst_max) {
+    int out = 0;
+    while (*src && out < dst_max - 2) {
+        if (*src == '"' || *src == '\\') {
+            dst[out++] = '\\';
+        }
+        dst[out++] = *src++;
+    }
+    dst[out] = '\0';
+}
+
+// ------------------------------------------------------------------
+// decode_unicode_escape — converts \uXXXX → single ASCII char
+// p points to the 4 hex digits that follow \u in the JSON stream.
+// ------------------------------------------------------------------
 static char decode_unicode_escape(const char* p) {
-    // p points to the 4 hex digits after \u
     unsigned int val = 0;
     for (int i = 0; i < 4; i++) {
         val <<= 4;
         char c = p[i];
-        if (c >= '0' && c <= '9') val |= (c - '0');
-        else if (c >= 'a' && c <= 'f') val |= (c - 'a' + 10);
-        else if (c >= 'A' && c <= 'F') val |= (c - 'A' + 10);
+        if      (c >= '0' && c <= '9') val |= (unsigned)(c - '0');
+        else if (c >= 'a' && c <= 'f') val |= (unsigned)(c - 'a' + 10);
+        else if (c >= 'A' && c <= 'F') val |= (unsigned)(c - 'A' + 10);
     }
     return (char)(val & 0x7F); // ASCII only
 }
 
+// ------------------------------------------------------------------
+// ollama_parse_json — walks the "response" JSON field, prints text,
+//   and executes anything inside <EXEC_CMD:...> tags.
+//
+// Handles all the escape forms Ollama models produce in practice:
+//   \uXXXX  — e.g. \u003c = '<', \u003e = '>'  (most common)
+//   Literal  < EXEC_CMD: ... >                    (fallback)
+//   \n       — newline inside the JSON string
+//   \t       — tab (printed as space)
+//   \"       — escaped quote inside the response text
+//
+// intercept_cmd is 256 bytes with an explicit bounds check — the
+// parser silently discards extra bytes rather than overflowing.
+// ------------------------------------------------------------------
+#define ICMD_MAX 255
+
 void ollama_parse_json(char* payload) {
-    char* resp = strstr(payload, "\"response\":\"");
-    if (resp) {
-        resp += 12; // Skip the JSON key
-        set_text_color(MAKE_COLOR(COLOR_LIGHT_MAGENTA, COLOR_BLACK));
-        print_string("\nAI: ");
-        
-        char intercept_cmd[64];
-        int intercept_idx = 0;
-        int catching = 0;
-        
-        while (*resp && *resp != '\"') {
-            // Handle \uXXXX Unicode escapes (e.g. \u003c = '<', \u003e = '>')
-            if (*resp == '\\' && *(resp+1) == 'u' &&
-                *(resp+2) && *(resp+3) && *(resp+4) && *(resp+5)) {
-                char decoded = decode_unicode_escape(resp + 2);
-                resp += 6; // consume \uXXXX
-                // Now treat 'decoded' as the current character
-                if (decoded == '<') {
-                    // Check for EXEC_CMD tag
-                    if (resp[0]=='E' && resp[1]=='X' && resp[2]=='E' &&
-                        resp[3]=='C' && resp[4]=='_' && resp[5]=='C' &&
-                        resp[6]=='M' && resp[7]=='D' && resp[8]==':') {
-                        catching = 1;
-                        resp += 9; // Skip EXEC_CMD:
-                    } else {
-                        if (catching) intercept_cmd[intercept_idx++] = decoded;
-                        else print_char(decoded);
-                    }
-                } else if (decoded == '>' && catching) {
-                    catching = 0;
-                    intercept_cmd[intercept_idx] = '\0';
+    // Skip past HTTP response headers if present (real Ollama response).
+    // Mock payloads have no \r\n\r\n so body == payload in that case.
+    char* body = payload;
+    char* hdr_end = strstr(payload, "\r\n\r\n");
+    if (hdr_end) body = hdr_end + 4;
+
+    char* resp = strstr(body, "\"response\":\"");
+    if (!resp) return; // Malformed or error response
+    resp += 12;        // Skip past  "response":"
+
+    set_text_color(MAKE_COLOR(COLOR_LIGHT_MAGENTA, COLOR_BLACK));
+    print_string("\nAI: ");
+
+    char intercept_cmd[ICMD_MAX + 1];
+    int  intercept_idx = 0;
+    int  catching      = 0;
+
+    while (*resp && *resp != '"') {
+
+        // ── \uXXXX Unicode escape ────────────────────────────────────────
+        if (*resp == '\\' && *(resp+1) == 'u' &&
+            *(resp+2) && *(resp+3) && *(resp+4) && *(resp+5)) {
+
+            char decoded = decode_unicode_escape(resp + 2);
+            resp += 6; // consume \uXXXX
+
+            if (decoded == '<') {
+                // Possible start of <EXEC_CMD: tag — skip optional spaces after '<'
+                const char *scan = resp;
+                while (*scan == ' ') scan++;
+                if (scan[0]=='E' && scan[1]=='X' && scan[2]=='E' &&
+                    scan[3]=='C' && scan[4]=='_' && scan[5]=='C' &&
+                    scan[6]=='M' && scan[7]=='D' && scan[8]==':') {
+                    catching      = 1;
                     intercept_idx = 0;
-                    set_text_color(MAKE_COLOR(COLOR_LIGHT_CYAN, COLOR_BLACK));
-                    print_string("\n[System: AI Agent Executing Autonomous Task: `");
-                    print_string(intercept_cmd);
-                    print_string("`]\n");
-                    reset_text_color();
-                    shell_execute(intercept_cmd);
-                    set_text_color(MAKE_COLOR(COLOR_LIGHT_MAGENTA, COLOR_BLACK));
+                    resp = (char *)(scan + 9); // skip [spaces]EXEC_CMD:
+                    while (*resp == ' ') resp++; // skip spaces after colon
                 } else {
-                    if (catching) intercept_cmd[intercept_idx++] = decoded;
-                    else print_char(decoded);
+                    if (catching && intercept_idx < ICMD_MAX)
+                        intercept_cmd[intercept_idx++] = decoded;
+                    else if (!catching)
+                        print_char(decoded);
                 }
-                continue;
-            }
-
-            // Handle \n literal escape
-            if (*resp == '\\' && *(resp+1) == 'n') {
-                print_char('\n');
-                resp += 2;
-                continue;
-            }
-
-            // Handle literal < (fallback if model sends raw angle brackets)
-            if (*resp == '<' && *(resp+1) == 'E' && *(resp+2) == 'X') {
-                catching = 1;
-                resp += 10; // Skip <EXEC_CMD:
-                continue;
-            }
-            if (catching && *resp == '>') {
+            } else if (decoded == '>' && catching) {
                 catching = 0;
+                // Trim trailing spaces from captured command
+                while (intercept_idx > 0 && intercept_cmd[intercept_idx-1] == ' ')
+                    intercept_idx--;
                 intercept_cmd[intercept_idx] = '\0';
                 intercept_idx = 0;
                 set_text_color(MAKE_COLOR(COLOR_LIGHT_CYAN, COLOR_BLACK));
-                print_string("\n[System: AI Agent Executing Autonomous Task: `");
+                print_string("\n[JARVIS Agent >> ");
                 print_string(intercept_cmd);
-                print_string("`]\n");
+                print_string("]\n");
                 reset_text_color();
                 shell_execute(intercept_cmd);
                 set_text_color(MAKE_COLOR(COLOR_LIGHT_MAGENTA, COLOR_BLACK));
-                resp++;
+            } else {
+                if (catching && intercept_idx < ICMD_MAX)
+                    intercept_cmd[intercept_idx++] = decoded;
+                else if (!catching)
+                    print_char(decoded);
+            }
+            continue;
+        }
+
+        // ── \n escape (JSON newline) ─────────────────────────────────────
+        if (*resp == '\\' && *(resp+1) == 'n') {
+            if (!catching) print_char('\n');
+            resp += 2;
+            continue;
+        }
+
+        // ── \t escape (JSON tab — print as space) ────────────────────────
+        if (*resp == '\\' && *(resp+1) == 't') {
+            if (!catching) print_char(' ');
+            resp += 2;
+            continue;
+        }
+
+        // ── \" escape (literal quote inside response text) ───────────────
+        if (*resp == '\\' && *(resp+1) == '"') {
+            if (catching && intercept_idx < ICMD_MAX)
+                intercept_cmd[intercept_idx++] = '"';
+            else if (!catching)
+                print_char('"');
+            resp += 2;
+            continue;
+        }
+
+        // ── \\ escape (literal backslash) ───────────────────────────────
+        if (*resp == '\\' && *(resp+1) == '\\') {
+            if (catching && intercept_idx < ICMD_MAX)
+                intercept_cmd[intercept_idx++] = '\\';
+            else if (!catching)
+                print_char('\\');
+            resp += 2;
+            continue;
+        }
+
+        // ── Literal <EXEC_CMD: — skip optional spaces after '<' ────────
+        if (!catching && *resp == '<') {
+            const char *scan = resp + 1;
+            while (*scan == ' ') scan++; // tolerate "< EXEC_CMD:"
+            if (scan[0]=='E' && scan[1]=='X' && scan[2]=='E' &&
+                scan[3]=='C' && scan[4]=='_' && scan[5]=='C' &&
+                scan[6]=='M' && scan[7]=='D' && scan[8]==':') {
+                catching      = 1;
+                intercept_idx = 0;
+                resp = (char *)(scan + 9); // skip <[spaces]EXEC_CMD:
+                while (*resp == ' ') resp++; // skip spaces after colon
                 continue;
             }
-            
-            if (catching) {
-                intercept_cmd[intercept_idx++] = *resp;
-            } else {
-                print_char(*resp);
-            }
-            resp++;
         }
-        reset_text_color();
+
+        // ── Close tag while catching ─────────────────────────────────────
+        if (catching && *resp == '>') {
+            catching = 0;
+            // Trim trailing spaces before executing
+            while (intercept_idx > 0 && intercept_cmd[intercept_idx-1] == ' ')
+                intercept_idx--;
+            intercept_cmd[intercept_idx] = '\0';
+            intercept_idx = 0;
+            set_text_color(MAKE_COLOR(COLOR_LIGHT_CYAN, COLOR_BLACK));
+            print_string("\n[JARVIS Agent >> ");
+            print_string(intercept_cmd);
+            print_string("]\n");
+            reset_text_color();
+            shell_execute(intercept_cmd);
+            set_text_color(MAKE_COLOR(COLOR_LIGHT_MAGENTA, COLOR_BLACK));
+            resp++;
+            continue;
+        }
+
+        // ── Normal character ─────────────────────────────────────────────
+        if (catching) {
+            // Bounds-checked: silently discard if at limit (no overflow)
+            if (intercept_idx < ICMD_MAX)
+                intercept_cmd[intercept_idx++] = *resp;
+        } else {
+            print_char(*resp);
+        }
+        resp++;
     }
+
+    reset_text_color();
 }
 
-static char rx_tcp_buffer[4096];
+// ------------------------------------------------------------------
+// TCP accumulation buffer
+//
+// Problem with the old per-segment approach:
+//   Ollama sends the JSON response across multiple TCP segments.
+//   If "response":" or an <EXEC_CMD:...> tag straddles a segment
+//   boundary, the old parser would silently miss it.
+//
+// Fix: accumulate all segments here and parse once the connection
+// closes (p == NULL callback).  8 KB handles responses up to ~6000
+// tokens of llama output which is more than enough for phi3.
+// ------------------------------------------------------------------
+static char rx_accum[8192];
+static int  rx_accum_len = 0;
 
-static err_t ollama_recv_cb(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
-    (void)arg;
-    (void)err;
+static err_t ollama_recv_cb(void *arg, struct tcp_pcb *tpcb,
+                             struct pbuf *p, err_t err) {
+    (void)arg; (void)err;
+
     if (!p) {
+        // Connection closed — the full HTTP response is accumulated.
         tcp_close(tpcb);
-        print_string("\nNetwork: Connection closed by Ollama.\nJARVIS [/] $ ");
+        if (rx_accum_len > 0) {
+            rx_accum[rx_accum_len] = '\0';
+            ollama_parse_json(rx_accum);
+        }
+        reset_text_color();
+        set_text_color(MAKE_COLOR(COLOR_LIGHT_GREEN, COLOR_BLACK));
+        print_string("\nJARVIS [/] $ ");
+        reset_text_color();
+        rx_accum_len = 0;
         return ERR_OK;
     }
-    
-    // Safely copy payload to a null-terminated buffer before parsing
-    int copy_len = p->tot_len;
-    if (copy_len > 4095) copy_len = 4095;
-    
-    pbuf_copy_partial(p, rx_tcp_buffer, copy_len, 0);
-    rx_tcp_buffer[copy_len] = '\0';
-    
-    ollama_parse_json(rx_tcp_buffer);
-    
+
+    // Append this segment to the accumulation buffer.
+    int space    = (int)sizeof(rx_accum) - rx_accum_len - 1;
+    int copy_len = (int)p->tot_len;
+    if (copy_len > space) copy_len = space;
+    if (copy_len > 0) {
+        pbuf_copy_partial(p, rx_accum + rx_accum_len, copy_len, 0);
+        rx_accum_len += copy_len;
+    }
+
     tcp_recved(tpcb, p->tot_len);
     pbuf_free(p);
     return ERR_OK;
 }
 
+// ------------------------------------------------------------------
+// ai_mock — offline test without a real Ollama server
+// ------------------------------------------------------------------
 void ollama_mock_intercept() {
-    print_string("Simulating AI Server Network Response...\n");
-    char* test_payload = "HTTP/1.1 200 OK\r\n\r\n{\"model\":\"" OLLAMA_MODEL "\",\"response\":\"I have investigated your hardware state. I will now autonomously scan the PCI bus for you.\\n<EXEC_CMD:pci storage>\"}";
+    print_string("Simulating AI Agent response (offline)...\n");
+    // Exercises: plain text, a \n escape, two EXEC_CMD tags.
+    char* test_payload =
+        "{\"model\":\"" OLLAMA_MODEL "\","
+        "\"response\":\"Scanning your system now!\\n"
+        "<EXEC_CMD:sysinfo>"
+        " Also listing storage devices: "
+        "<EXEC_CMD:pci storage>"
+        "\"}";
     ollama_parse_json(test_payload);
 }
 
+// ------------------------------------------------------------------
+// ollama_connected_cb — builds and sends the HTTP POST to Ollama
+// ------------------------------------------------------------------
 static err_t ollama_connected_cb(void *arg, struct tcp_pcb *tpcb, err_t err) {
     (void)arg;
     if (err != ERR_OK) {
@@ -167,54 +371,134 @@ static err_t ollama_connected_cb(void *arg, struct tcp_pcb *tpcb, err_t err) {
         print_string(").\nJARVIS [/] $ ");
         return err;
     }
-    
-    print_string("Network: Connected! Using model: " OLLAMA_MODEL "\n");
-    
-    char json_body[512];
-    strcpy(json_body, "{\"model\": \"" OLLAMA_MODEL "\", \"prompt\": \"You are the core intelligence of Jarvis OS. Memory is stable. You can control this terminal. Wrap OS commands in <EXEC_CMD:command>. User says: ");
-    strcat(json_body, global_prompt);
-    strcat(json_body, "\", \"stream\": false}");
-    
+    print_string("Network: Connected! Model: " OLLAMA_MODEL "\n");
+
+    // JSON-escape the user prompt so stray " or \ can't break the body.
+    static char escaped_prompt[1024];
+    json_escape(global_prompt, escaped_prompt, (int)sizeof(escaped_prompt));
+
+    // Build JSON body.
+    // Layout: {"model":"...","system":"<SYSTEM_PROMPT>","prompt":"<user>","stream":false}
+    // Worst-case size: ~900 (system) + ~1000 (user) + ~80 (keys) = ~1980 → 3072 is safe.
+    static char json_body[3072];
+    strcpy(json_body,
+        "{\"model\":\"" OLLAMA_MODEL "\","
+        "\"system\":\"" SYSTEM_PROMPT "\","
+        "\"prompt\":\"");
+
+    // Append escaped user prompt only if it fits.
+    int used = strlen(json_body);
+    int esc_len = strlen(escaped_prompt);
+    if (used + esc_len < (int)sizeof(json_body) - 24) {
+        strcat(json_body, escaped_prompt);
+    } else {
+        print_string("Network: Prompt truncated (too long).\n");
+    }
+    strcat(json_body, "\",\"stream\":false}");
+
+    // Build HTTP request.
+    // Worst-case: ~200 (headers) + ~2100 (body) = ~2300 → 4096 is safe.
     char len_str[16];
     itoa(strlen(json_body), len_str);
-    
-    char request[1024];
+
+    static char request[4096];
     strcpy(request, "POST /api/generate HTTP/1.1\r\n");
     strcat(request, "Host: ");
     strcat(request, global_ip_str);
     strcat(request, ":11434\r\n");
     strcat(request, "Content-Type: application/json\r\n");
-    strcat(request, "Connection: close\r\n");       // CRITICAL: tells server not to wait for more data
+    strcat(request, "Connection: close\r\n");  // server flushes immediately
     strcat(request, "Content-Length: ");
     strcat(request, len_str);
     strcat(request, "\r\n\r\n");
     strcat(request, json_body);
-    
-    tcp_write(tpcb, request, strlen(request), TCP_WRITE_FLAG_COPY);
-    tcp_output(tpcb);
+
+    int req_len = strlen(request);
+    if (req_len >= (int)sizeof(request)) {
+        print_string("Network: Request overflowed buffer! Aborting.\n");
+        tcp_close(tpcb);
+        return ERR_MEM;
+    }
+
+    err_t write_err = tcp_write(tpcb, request, req_len, TCP_WRITE_FLAG_COPY);
+    if (write_err != ERR_OK) {
+        print_string("Network: tcp_write() FAILED (err=");
+        kprint_dec((int)write_err);
+        print_string(") — request too large for TCP_SND_BUF!\n");
+        tcp_close(tpcb);
+        return write_err;
+    }
+    err_t out_err = tcp_output(tpcb);
+    if (out_err != ERR_OK) {
+        print_string("Network: tcp_output() FAILED (err=");
+        kprint_dec((int)out_err);
+        print_string(")\n");
+    }
+    print_string("Network: HTTP POST sent (");
+    kprint_dec(req_len);
+    print_string(" bytes). Waiting for Ollama...\n");
     return ERR_OK;
 }
 
-// Error callback — called by lwIP when a TCP connection is aborted or reset
+// ------------------------------------------------------------------
+// Error callback
+// ------------------------------------------------------------------
 static void ollama_err_cb(void *arg, err_t err) {
     (void)arg;
-    print_string("\nNetwork: TCP connection error (err=");
+    print_string("\nNetwork: TCP error (err=");
     kprint_dec((int)err);
-    print_string(") — Ollama unreachable or connection reset.\nJARVIS [/] $ ");
+    print_string(") — Ollama unreachable or reset.\nJARVIS [/] $ ");
+    rx_accum_len = 0;
 }
 
+// ------------------------------------------------------------------
+// ollama_request — public API called by 'ai <ip> <prompt>'
+// ------------------------------------------------------------------
 void ollama_request(const char* ip_str, const char* prompt) {
-    int len = strlen(prompt);
-    if (len > 255) len = 255;
-    strncpy(global_prompt, prompt, len);
+    // Reset accumulation buffer before every new request.
+    rx_accum_len = 0;
+
+    // ----------------------------------------------------------------
+    // Inject dynamic OS context into the user message so the AI always
+    // knows: (a) its CWD, (b) that it MUST execute at least one command.
+    // This prevents the AI from responding with pure text and no actions.
+    // ----------------------------------------------------------------
+    extern char fat32_cwd_path[];
+    static char context_prompt[1024];
+    strcpy(context_prompt, "[JARVIS OS STATE] CWD=");
+    strcat(context_prompt, fat32_cwd_path);
+    strcat(context_prompt, " | Task: ");
+
+    // Append user prompt (truncated if combined would overflow)
+    int ctx_len  = strlen(context_prompt);
+    int user_len = strlen(prompt);
+    // Reserve space for the mandatory suffix (~60 chars) + null
+    int max_user = (int)sizeof(context_prompt) - ctx_len - 64;
+    if (max_user < 0) max_user = 0;
+    if (user_len > max_user) user_len = max_user;
+    int cur_len = strlen(context_prompt);
+    strncpy(context_prompt + cur_len, prompt, user_len);
+    context_prompt[cur_len + user_len] = '\0';
+
+    // Mandatory execution reminder appended to every message.
+    // This is the single most effective way to stop the AI from
+    // responding with only text and no <EXEC_CMD:> tags.
+    strcat(context_prompt, " | EXECUTE commands now.");
+
+    int len = strlen(context_prompt);
+    if (len > 1023) len = 1023;
+    strncpy(global_prompt, context_prompt, len);
     global_prompt[len] = '\0';
-    
+
     strncpy(global_ip_str, ip_str, 31);
     global_ip_str[31] = '\0';
-    
+
     struct tcp_pcb *pcb = tcp_new();
-    if (!pcb) { print_string("Network: Out of memory for Socket.\n"); return; }
-    
+    if (!pcb) {
+        print_string("Network: Out of memory for TCP socket.\n");
+        return;
+    }
+
     ip4_addr_t server;
     if (!ip4addr_aton(ip_str, &server)) {
         print_string("Network: Invalid IP address format!\n");
@@ -222,53 +506,46 @@ void ollama_request(const char* ip_str, const char* prompt) {
         return;
     }
 
-    // --- ARP Pre-warm ---
-    // Sending etharp_query() BEFORE tcp_connect() forces lwIP to immediately
-    // send an ARP request for the server's MAC. The shell_task() poll loop
-    // will process the ARP reply in the next few milliseconds, so that by
-    // the time tcp_connect() fires its SYN, the ARP table is already populated
-    // and the SYN goes out immediately on the wire instead of being queued
-    // behind an ARP round-trip.
+    // ARP pre-warm: resolve the server MAC before tcp_connect() fires
+    // the SYN, so the SYN goes out immediately without an ARP round-trip.
     extern struct netif *netif_default;
     if (netif_default) {
-        ip_addr_t server_ipaddr;
-        ip_addr_copy_from_ip4(server_ipaddr, server);
-        etharp_query(netif_default, ip_2_ip4(&server_ipaddr), NULL);
+        ip_addr_t srv;
+        ip_addr_copy_from_ip4(srv, server);
+        etharp_query(netif_default, ip_2_ip4(&srv), NULL);
         print_string("Network: ARP pre-warm sent for ");
         print_string(ip_str);
         print_string("\n");
     }
-    
+
     tcp_recv(pcb, ollama_recv_cb);
-    tcp_err(pcb, ollama_err_cb);   // Register error callback to catch refused/reset connections
-    err_t err = tcp_connect(pcb, &server, 11434, ollama_connected_cb);
-    
-    if (err != ERR_OK) {
-        print_string("Network: Failed to initiate TCP routing.\n");
+    tcp_err(pcb, ollama_err_cb);
+    err_t e = tcp_connect(pcb, &server, 11434, ollama_connected_cb);
+    if (e != ERR_OK) {
+        print_string("Network: tcp_connect() failed.\n");
         tcp_close(pcb);
     }
 }
 
-// --- ICMP PING IMPLEMENTATION ---
+// ======================================================================
+// ICMP Ping (unchanged from previous version)
+// ======================================================================
 #include "lwip/raw.h"
 #include "lwip/icmp.h"
 #include "lwip/inet_chksum.h"
 #include "timer.h"
 
-static struct raw_pcb *ping_pcb = NULL;
-static uint32_t ping_start_time = 0;
-static ip4_addr_t ping_target;
+static struct raw_pcb *ping_pcb       = NULL;
+static uint32_t        ping_start_ms  = 0;
+static ip4_addr_t      ping_target;
 
-static u8_t ping_recv_cb(void *arg, struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *addr) {
-    (void)arg;
-    (void)pcb;
-    
+static u8_t ping_recv_cb(void *arg, struct raw_pcb *pcb,
+                          struct pbuf *p, const ip_addr_t *addr) {
+    (void)arg; (void)pcb;
     if (p->tot_len >= sizeof(struct icmp_echo_hdr)) {
         struct icmp_echo_hdr *iecho = (struct icmp_echo_hdr *)p->payload;
-        if (iecho->type == ICMP_ER) { // Echo Reply
-            uint32_t end_time = timer_get_ticks();
-            uint32_t rtt = (end_time - ping_start_time) * 10; // Assuming 100Hz PIT = 10ms per tick
-            
+        if (iecho->type == ICMP_ER) {
+            uint32_t rtt = (timer_get_ticks() - ping_start_ms) * 10;
             print_string("64 bytes from ");
             print_string(ip4addr_ntoa(ip_2_ip4(addr)));
             print_string(": icmp_seq=");
@@ -276,12 +553,11 @@ static u8_t ping_recv_cb(void *arg, struct raw_pcb *pcb, struct pbuf *p, const i
             print_string(" time=");
             kprint_dec(rtt);
             print_string("ms\n");
-            
             pbuf_free(p);
-            return 1; // Ate it
+            return 1; // consumed
         }
     }
-    return 0; // Didn't eat it
+    return 0;
 }
 
 void ping_request(const char* ip_str) {
@@ -289,39 +565,28 @@ void ping_request(const char* ip_str) {
         print_string("Ping: Invalid IP address.\n");
         return;
     }
-
     if (!ping_pcb) {
         ping_pcb = raw_new(IP_PROTO_ICMP);
-        if (!ping_pcb) {
-            print_string("Ping: Could not create RAW PCB.\n");
-            return;
-        }
+        if (!ping_pcb) { print_string("Ping: No RAW PCB.\n"); return; }
         raw_recv(ping_pcb, ping_recv_cb, NULL);
         raw_bind(ping_pcb, IP4_ADDR_ANY);
     }
-
     struct pbuf *p = pbuf_alloc(PBUF_IP, sizeof(struct icmp_echo_hdr), PBUF_RAM);
-    if (!p) {
-        print_string("Ping: Out of memory for pbuf.\n");
-        return;
-    }
+    if (!p) { print_string("Ping: Out of memory.\n"); return; }
 
     struct icmp_echo_hdr *iecho = (struct icmp_echo_hdr *)p->payload;
     ICMPH_TYPE_SET(iecho, ICMP_ECHO);
     ICMPH_CODE_SET(iecho, 0);
     iecho->chksum = 0;
-    iecho->id = lwip_htons(0xBEEF);
-    iecho->seqno = lwip_htons(1);
+    iecho->id     = lwip_htons(0xBEEF);
+    iecho->seqno  = lwip_htons(1);
     iecho->chksum = inet_chksum(iecho, p->len);
 
-    print_string("PING ");
-    print_string(ip_str);
-    print_string(" (");
-    print_string(ip_str);
+    print_string("PING "); print_string(ip_str);
+    print_string(" ("); print_string(ip_str);
     print_string("): 56 data bytes\n");
 
-    ping_start_time = timer_get_ticks();
+    ping_start_ms = timer_get_ticks();
     raw_sendto(ping_pcb, p, (ip_addr_t *)&ping_target);
     pbuf_free(p);
 }
-

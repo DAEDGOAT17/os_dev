@@ -18,7 +18,7 @@
 char shell_buffer[256];
 int buffer_idx = 0;
 const char* commands[] = {
-    "ls", "cd", "cat", "touch", "write", "rm", "mkdir", "rmdir", "clear", "help", "ps", "mem", "reboot", "sysinfo", "cpuid", "arch", "pci", "ahci", "ifconfig", "netstat", "ai", "ai_mock", "pktdump", "ping", NULL
+    "ls", "cd", "cat", "touch", "write", "rm", "mkdir", "rmdir", "clear", "echo", "help", "ps", "mem", "reboot", "sysinfo", "cpuid", "arch", "pci", "ahci", "ifconfig", "netstat", "ai", "ai_mock", "pktdump", "ping", NULL
 };
 
 // Static variables for filename completion state
@@ -520,6 +520,11 @@ void shell_execute(char* cmd) {
     }
     else if (strcmp(cmd, "clear") == 0) {
         clear_screen();
+        return;
+    }
+    else if (strcmp(cmd, "echo") == 0) {
+        if (arg) print_string(arg);
+        print_char('\n');
         return;
     }
     else if (strcmp(cmd, "help") == 0) {
