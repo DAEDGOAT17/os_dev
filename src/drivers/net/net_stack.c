@@ -26,7 +26,7 @@ extern void shell_execute(char* cmd);
 // ------------------------------------------------------------------
 #define OLLAMA_MODEL "phi3:latest"
 
-static char global_prompt[1024];  // enlarged: holds user msg + injected CWD context
+static char global_prompt[8192];
 static char global_ip_str[32];
 
 // ------------------------------------------------------------------
@@ -42,7 +42,7 @@ static char global_ip_str[32];
 // it must never contain a raw " character.
 // ------------------------------------------------------------------
 #define SYSTEM_PROMPT                                                           \
-    "You ARE JARVIS, the autonomous execution kernel of Jarvis OS. "             \
+    "You ARE JARVIS, the autonomous execution kernel of Jarvis OS. YOU ARE IN AN AUTOMATED EXECUTION LOOP. " \
     "Every message is a task. Every task MUST be executed immediately."          \
     "\\n\\nFILESYSTEM IDENTITY:\\n"                                              \
     "  - FAT32 RAM disk. Root is '/'. This is the ENTIRE filesystem.\\n"        \
@@ -325,8 +325,8 @@ void ollama_parse_json(char* payload) {
             strcat(feedback_prompt, "\"\\nNext? (Use <EXEC_CMD:stop> if done)");
 
             print_string("\n[Network: Queuing Agent Feedback...]\n");
-            extern void ollama_request(const char* ip_str, const char* prompt);
-            ollama_request(global_ip_str, feedback_prompt);
+            extern void ollama_feedback_request(const char* ip_str, const char* feedback);
+            ollama_feedback_request(global_ip_str, feedback_prompt);
 
             resp++;
             break; // Essential: don't process multiple tags at once to avoid racing network state
@@ -424,13 +424,12 @@ static err_t ollama_connected_cb(void *arg, struct tcp_pcb *tpcb, err_t err) {
     print_string("Network: Connected! Model: " OLLAMA_MODEL "\n");
 
     // JSON-escape the user prompt so stray " or \ can't break the body.
-    static char escaped_prompt[1024];
+    static char escaped_prompt[8192];
     json_escape(global_prompt, escaped_prompt, (int)sizeof(escaped_prompt));
 
     // Build JSON body.
     // Layout: {"model":"...","system":"<SYSTEM_PROMPT>","prompt":"<user>","stream":false}
-    // Worst-case size: ~900 (system) + ~1000 (user) + ~80 (keys) = ~1980 → 3072 is safe.
-    static char json_body[3072];
+    static char json_body[16384];
     strcpy(json_body,
         "{\"model\":\"" OLLAMA_MODEL "\","
         "\"system\":\"" SYSTEM_PROMPT "\","
@@ -451,7 +450,7 @@ static err_t ollama_connected_cb(void *arg, struct tcp_pcb *tpcb, err_t err) {
     char len_str[16];
     itoa(strlen(json_body), len_str);
 
-    static char request[4096];
+    static char request[16384];
     strcpy(request, "POST /api/generate HTTP/1.1\r\n");
     strcat(request, "Host: ");
     strcat(request, global_ip_str);
@@ -499,6 +498,28 @@ static void ollama_err_cb(void *arg, err_t err) {
     kprint_dec((int)err);
     print_string(") — Ollama unreachable or reset.\nJARVIS [/] $ ");
     rx_accum_len = 0;
+}
+
+void ollama_feedback_request(const char* ip_str, const char* feedback) {
+    rx_accum_len = 0;
+
+    int g_len = strlen(global_prompt);
+    int f_len = strlen(feedback);
+    if (g_len + f_len + 5 < 8192) {
+        strcat(global_prompt, "\n\n");
+        strcat(global_prompt, feedback);
+    } else {
+        print_string("Network: Memory limit reached for autonomous chain. Halting.\n");
+        return;
+    }
+
+    struct tcp_pcb *pcb = tcp_new();
+    if (!pcb) return;
+    ip4_addr_t server;
+    if (!ip4addr_aton(ip_str, &server)) { tcp_close(pcb); return; }
+    tcp_recv(pcb, ollama_recv_cb);
+    tcp_err(pcb, ollama_err_cb);
+    tcp_connect(pcb, &server, 11434, ollama_connected_cb);
 }
 
 // ------------------------------------------------------------------

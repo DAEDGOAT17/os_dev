@@ -33,9 +33,13 @@
 #define LWIP_TCP 1
 #define LWIP_RAW 1
 #define LWIP_DHCP 1 // Enable DHCP for dynamic IP assignment
+#define LWIP_AUTOIP 1 // Fallback to 169.254.x.x without a router
+#define LWIP_DHCP_AUTOIP_COOP 1
+#define LWIP_DHCP_AUTOIP_COOP_TRIES 3
 #define LWIP_DNS 0
 #define LWIP_NETCONN 0 // Requires RTOS
 #define LWIP_SOCKET 0  // Requires RTOS
+#define LWIP_NETIF_STATUS_CALLBACK 1
 
 // Checksum by software
 #define CHECKSUM_GEN_IP 1

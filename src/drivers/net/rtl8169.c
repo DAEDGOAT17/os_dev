@@ -10,6 +10,13 @@
 #include "lwip/etharp.h"
 #include "lwip/pbuf.h"
 #include "lwip/dhcp.h"
+#include "lwip/ip4_addr.h"
+
+static void rtl8169_netif_status_cb(struct netif *netif) {
+    print_string("\n[RTL8169] Network initialized! IP Address: ");
+    print_string(ip4addr_ntoa(netif_ip4_addr(netif)));
+    print_string("\nJARVIS [/] $ ");
+}
 
 // Explicit cache line flusher to push CPU writes to main memory for DMA safely.
 static inline void flush_cache_line(volatile void *p) {
@@ -460,20 +467,23 @@ void rtl8169_init(uint32_t bus, uint32_t device, uint32_t function) {
         }
     }
     
-    // Mount hardware into software network stack using Static IP
-    // Note: Aligned to the 172.16.100.x subnet seen in your packet capture
+    // Mount hardware into software network stack using DHCP
     lwip_init();
     ip4_addr_t ipaddr, netmask, gw;
     
-    IP4_ADDR(&ipaddr, 172, 16, 100, 50); 
-    IP4_ADDR(&netmask, 255, 255, 255, 0);
-    IP4_ADDR(&gw, 172, 16, 100, 1);
+    ip4_addr_set_zero(&ipaddr);
+    ip4_addr_set_zero(&netmask);
+    ip4_addr_set_zero(&gw);
 
     netif_add(&rtl_netif, &ipaddr, &netmask, &gw, NULL, rtl8169_netif_init, netif_input);
     netif_set_default(&rtl_netif);
+    
+    netif_set_status_callback(&rtl_netif, rtl8169_netif_status_cb);
     netif_set_up(&rtl_netif);
+    
+    dhcp_start(&rtl_netif);
 
-    print_string("RTL8169: lwIP Bound to Hardware! Static IP set to 172.16.100.50\n");
+    print_string("RTL8169: lwIP Bound to Hardware! Requesting DHCP...\n");
 
     // Enable timer-IRQ-driven network polling now that lwIP is fully initialized.
     // From this point the timer handler calls rtl8169_poll() + sys_check_timeouts()
