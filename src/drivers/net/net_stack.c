@@ -24,7 +24,7 @@ extern void shell_execute(char* cmd);
 // ------------------------------------------------------------------
 // Change to match the exact model name shown by 'ollama list'
 // ------------------------------------------------------------------
-#define OLLAMA_MODEL "phi3:latest"
+#define OLLAMA_MODEL "gemma:12b"
 
 static char global_prompt[8192];
 static char global_ip_str[32];
