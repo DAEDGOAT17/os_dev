@@ -122,7 +122,7 @@ make
 
 ## 📸 Demo
 
-![Jarvis OS Demo](images/jarvis-os-image.jpg)
+![Jarvis OS Demo](https://raw.githubusercontent.com/DAEDGOAT17/AOS/pankaj/images/jarvis-os-image.jpg)
 
 ## 📚 Learning Focus
 
