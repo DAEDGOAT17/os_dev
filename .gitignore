@@ -2,7 +2,7 @@
 # Ignore all object files and dependency files
 build/*.o
 build/*.d
-blog_docs/
+
 
 # Ignore the final linked kernel ELF
 kernel.elf

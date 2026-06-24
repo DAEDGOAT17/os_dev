@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AOS - Technical Documentation</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #333;
+        line-height: 1.6;
+        min-height: 100vh;
+      }
+
+      header {
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 3rem 0;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      }
+
+      header h1 {
+        font-size: 3.5rem;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      header p {
+        font-size: 1.2rem;
+        color: #aaa;
+        margin-bottom: 1rem;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 3rem 2rem;
+      }
+
+      .intro-section {
+        background: white;
+        border-radius: 15px;
+        padding: 3rem;
+        margin-bottom: 3rem;
+        box-shadow: 0 15px 50px rgba(0, 0, 0, 0.2);
+        animation: slideUp 0.6s ease-out;
+      }
+
+      .intro-section h2 {
+        color: #667eea;
+        margin-bottom: 1.5rem;
+        font-size: 2rem;
+      }
+
+      .intro-section p {
+        font-size: 1.1rem;
+        color: #555;
+        margin-bottom: 1rem;
+        line-height: 1.8;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 2rem;
+        margin: 2rem 0;
+      }
+
+      .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 10px;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        transition: transform 0.3s ease;
+      }
+
+      .stat-card:hover {
+        transform: translateY(-5px);
+      }
+
+      .stat-card .number {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+      }
+
+      .stat-card .label {
+        font-size: 0.95rem;
+        opacity: 0.9;
+      }
+
+      .documentation-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+        margin-bottom: 3rem;
+      }
+
+      .doc-card {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        cursor: pointer;
+      }
+
+      .doc-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+      }
+
+      .doc-card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem 1.5rem;
+        text-align: center;
+      }
+
+      .doc-card-header h3 {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .doc-card-header .icon {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .doc-card-content {
+        padding: 1.5rem;
+      }
+
+      .doc-card-content p {
+        color: #666;
+        margin-bottom: 1rem;
+        font-size: 0.95rem;
+        line-height: 1.6;
+      }
+
+      .doc-links {
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+
+      .doc-links a {
+        display: inline-block;
+        color: #667eea;
+        text-decoration: none;
+        padding: 0.7rem 1rem;
+        border-radius: 6px;
+        background: #f0f0f0;
+        transition: all 0.3s ease;
+        font-weight: 500;
+      }
+
+      .doc-links a:hover {
+        background: #667eea;
+        color: white;
+        padding-left: 1.3rem;
+      }
+
+      .learning-paths {
+        background: white;
+        border-radius: 15px;
+        padding: 3rem;
+        margin-bottom: 3rem;
+        box-shadow: 0 15px 50px rgba(0, 0, 0, 0.2);
+      }
+
+      .learning-paths h2 {
+        color: #667eea;
+        margin-bottom: 2rem;
+        font-size: 2rem;
+      }
+
+      .path-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 2rem;
+      }
+
+      .path-card {
+        background: #f9f9f9;
+        border-left: 4px solid #667eea;
+        padding: 2rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+      }
+
+      .path-card:hover {
+        background: #f0f0f0;
+        border-left-color: #764ba2;
+      }
+
+      .path-card h4 {
+        color: #667eea;
+        margin-bottom: 1rem;
+        font-size: 1.3rem;
+      }
+
+      .path-card ol {
+        margin-left: 1.5rem;
+      }
+
+      .path-card li {
+        color: #555;
+        margin-bottom: 0.5rem;
+        line-height: 1.6;
+      }
+
+      .cta-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 3rem;
+        border-radius: 15px;
+        text-align: center;
+        margin-bottom: 3rem;
+        box-shadow: 0 15px 50px rgba(102, 126, 234, 0.3);
+      }
+
+      .cta-section h2 {
+        font-size: 2.2rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .cta-section p {
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+        opacity: 0.95;
+      }
+
+      .cta-button {
+        display: inline-block;
+        background: white;
+        color: #667eea;
+        padding: 1rem 2.5rem;
+        border-radius: 50px;
+        text-decoration: none;
+        font-weight: bold;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      }
+
+      .cta-button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+      }
+
+      footer {
+        background: rgba(0, 0, 0, 0.9);
+        color: #aaa;
+        text-align: center;
+        padding: 2rem;
+        margin-top: 3rem;
+        border-top: 2px solid #667eea;
+      }
+
+      footer p {
+        margin-bottom: 0.5rem;
+      }
+
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateY(30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .feature-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin: 2rem 0;
+      }
+
+      .feature-item {
+        display: flex;
+        gap: 1rem;
+      }
+
+      .feature-icon {
+        font-size: 1.5rem;
+        color: #667eea;
+        flex-shrink: 0;
+      }
+
+      .feature-text h4 {
+        color: #333;
+        margin-bottom: 0.3rem;
+      }
+
+      .feature-text p {
+        color: #666;
+        font-size: 0.9rem;
+      }
+
+      @media (max-width: 768px) {
+        header h1 {
+          font-size: 2rem;
+        }
+
+        .intro-section {
+          padding: 1.5rem;
+        }
+
+        .container {
+          padding: 1rem;
+        }
+
+        .documentation-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .cta-section {
+          padding: 2rem 1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>🖥️ AOS</h1>
+      <p>Modern 64-bit Educational Kernel - Complete Technical Documentation</p>
+    </header>
+
+    <div class="container">
+      <!-- Introduction Section -->
+      <div class="intro-section">
+        <h2>Welcome to AOS Documentation</h2>
+        <p>
+          AOS is a powerful x86_64 monolithic kernel built from scratch
+          for learning OS internals and AI integration. This comprehensive
+          documentation covers every component, from bootloader to network
+          stack, with detailed explanations and code walkthroughs suitable for
+          both learning and production reference.
+        </p>
+        <p>
+          Whether you're a student exploring operating system concepts, a
+          developer implementing kernel features, or someone interested in how
+          modern systems work at the lowest level, you'll find everything you
+          need here.
+        </p>
+
+        <div class="stats">
+          <div class="stat-card">
+            <div class="number">30+</div>
+            <div class="label">Core Modules</div>
+          </div>
+          <div class="stat-card">
+            <div class="number">15K+</div>
+            <div class="label">Lines of Code</div>
+          </div>
+          <div class="stat-card">
+            <div class="number">2</div>
+            <div class="label">Boot Methods</div>
+          </div>
+          <div class="stat-card">
+            <div class="number">100%</div>
+            <div class="label">Open Source</div>
+          </div>
+        </div>
+
+        <h3 style="color: #667eea; margin-top: 2rem; margin-bottom: 1rem">
+          ✨ Key Features
+        </h3>
+        <div class="feature-list">
+          <div class="feature-item">
+            <div class="feature-icon">⚡</div>
+            <div class="feature-text">
+              <h4>Direct x86_64 Assembly</h4>
+              <p>Hand-crafted GDT, IDT, and paging tables</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">🚀</div>
+            <div class="feature-text">
+              <h4>Modern Boot Support</h4>
+              <p>UEFI and BIOS compatibility with Multiboot 2</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">💾</div>
+            <div class="feature-text">
+              <h4>Advanced Memory</h4>
+              <p>4-level paging, bitmap PMM, dynamic heap</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">⌨️</div>
+            <div class="feature-text">
+              <h4>Complete I/O</h4>
+              <p>APIC routing, ATA/AHCI, keyboard, VGA</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">📁</div>
+            <div class="feature-text">
+              <h4>Functional Filesystem</h4>
+              <p>FAT32 with GPT/MBR partition support</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">🔄</div>
+            <div class="feature-text">
+              <h4>Multitasking</h4>
+              <p>Round-robin scheduler with context switching</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">🌐</div>
+            <div class="feature-text">
+              <h4>Network Stack</h4>
+              <p>Embedded lwIP TCP/IP with multiple NIC drivers</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">🤖</div>
+            <div class="feature-text">
+              <h4>AI Foundation</h4>
+              <p>Tokenization and LLM inference support</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Documentation Grid -->
+      <h2
+        style="
+          color: white;
+          margin-bottom: 2rem;
+          font-size: 2.2rem;
+          text-align: center;
+        "
+      >
+        📚 Documentation Sections
+      </h2>
+
+      <div class="documentation-grid">
+        <!-- Architecture -->
+        <div class="doc-card">
+          <div class="doc-card-header">
+            <div class="icon">🏗️</div>
+            <h3>Architecture & Boot</h3>
+          </div>
+          <div class="doc-card-content">
+            <p>
+              Learn how the CPU boots and transitions to 64-bit mode, including
+              segmentation, descriptor tables, and bootloader interaction.
+            </p>
+            <div class="doc-links">
+              <a href="architecture/gdt.html">Global Descriptor Table (GDT)</a>
+              <a href="interrupt_io/idt.html">Interrupt Descriptor Table</a>
+              <a href="architecture/bootloader.html">Bootloader & Multiboot</a>
+              <a href="">Long Mode Transition</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Memory Management -->
+        <div class="doc-card">
+          <div class="doc-card-header">
+            <div class="icon">💾</div>
+            <h3>Memory Management</h3>
+          </div>
+          <div class="doc-card-content">
+            <p>
+              Explore physical and virtual memory management, paging structures,
+              and dynamic memory allocation for the kernel.
+            </p>
+            <div class="doc-links">
+              <a href="memory/pmm.html">Physical Memory Manager</a>
+              <a href="memory/vmm.html">Virtual Memory (Paging)</a>
+              <a href="memory/kmalloc.html">Kernel Memory Allocator</a>
+              <a href="memory/vmm.html">Memory Layout</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interrupts & I/O -->
+        <div class="doc-card">
+          <div class="doc-card-header">
+            <div class="icon">⚡</div>
+            <h3>Interrupts & I/O</h3>
+          </div>
+          <div class="doc-card-content">
+            <p>
+              Understand how the system handles hardware interrupts, APIC
+              controllers, timers, and direct I/O port access.
+            </p>
+            <div class="doc-links">
+              <a href="interrupt_io/idt.html">Interrupt Handling</a>
+              <a href="interrupt_io/apic.html">APIC/IO-APIC Controller</a>
+              <a href="interrupt_io/timer.html">Timer Subsystem</a>
+              <a href="">I/O Port Access</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Device Drivers -->
+        <div class="doc-card">
+          <div class="doc-card-header">
+            <div class="icon">🖲️</div>
+            <h3>Device Drivers</h3>
+          </div>
+          <div class="doc-card-content">
+            <p>
+              Deep dive into hardware drivers for storage, input, output, and
+              bus enumeration with code examples.
+            </p>
+            <div class="doc-links">
+              <a href="drivers/ata_driver.html">ATA/IDE Storage</a>
+              <a href="drivers/ahci_driver.html">AHCI SATA</a>
+              <a href="drivers/keyboard_driver.html">PS/2 Keyboard</a>
+              <a href="drivers/screen_driver.html">VGA Text Mode</a>
+              <a href="drivers/pci_driver.html">PCI Bus</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filesystem -->
+        <div class="doc-card">
+          <div class="doc-card-header">
+            <div class="icon">📁</div>
+            <h3>Filesystem</h3>
+          </div>
+          <div class="doc-card-content">
+            <p>
+              Understand FAT32 filesystem implementation, partition management,
+              and file operations.
+            </p>
+            <div class="doc-links">
+              <a href="filesystem/fat32.html">FAT32 Filesystem</a>
+              <a href="filesystem/gpt.html">Disk Partitioning</a>
+              <a href="filesystem/fat32.html">File I/O</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Core Systems -->
+        <div class="doc-card">
+          <div class="doc-card-header">
+            <div class="icon">⚙️</div>
+            <h3>Core Systems</h3>
+          </div>
+          <div class="doc-card-content">
+            <p>
+              Explore kernel initialization, task management, scheduling, and
+              the command-line shell.
+            </p>
+            <div class="doc-links">
+              <a href="core_systems/kernel_init.html">Kernel Initialization</a>
+              <a href="core_systems/task_management.html">Task Management</a>
+              <a href="core_systems/scheduler.html">Round-Robin Scheduler</a>
+              <a href="core_systems/shell.html">Shell & Commands</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Networking -->
+        <div class="doc-card">
+          <div class="doc-card-header">
+            <div class="icon">🌐</div>
+            <h3>Networking</h3>
+          </div>
+          <div class="doc-card-content">
+            <p>
+              Discover the embedded lwIP TCP/IP stack and network interface
+              drivers.
+            </p>
+            <div class="doc-links">
+              <a href="networking/lwip_stack.html">lwIP TCP/IP Stack</a>
+              <a href="networking/ethernet.html">Ethernet Layer</a>
+              <a href="networking/rtl8169_driver.html">RTL8169 Driver</a>
+              <a href="networking/e1000_driver.html">E1000 Mock Driver</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Learning Paths -->
+      <div class="learning-paths">
+        <h2>🎓 Learning Paths</h2>
+        <p style="color: #666; margin-bottom: 2rem">
+          Choose your journey based on experience level:
+        </p>
+
+        <div class="path-grid">
+          <div class="path-card">
+            <h4>🌱 Beginner Path (3 weeks)</h4>
+            <ol>
+              <li>Bootloader & Multiboot</li>
+              <li>Global Descriptor Table (GDT)</li>
+              <li>Physical Memory Basics</li>
+              <li>Interrupts Overview</li>
+              <li>VGA Text Output</li>
+              <li>Keyboard Input</li>
+            </ol>
+          </div>
+
+          <div class="path-card">
+            <h4>📈 Intermediate Path (4 weeks)</h4>
+            <ol>
+              <li>Deep Virtual Memory</li>
+              <li>APIC Routing</li>
+              <li>Task Scheduling</li>
+              <li>ATA Storage</li>
+              <li>FAT32 Filesystem</li>
+              <li>Shell Commands</li>
+            </ol>
+          </div>
+
+          <div class="path-card">
+            <h4>⚡ Advanced Path (6+ weeks)</h4>
+            <ol>
+              <li>Kernel Allocator</li>
+              <li>lwIP Network Stack</li>
+              <li>System Calls</li>
+              <li>User Mode Ring 3</li>
+              <li>SMP Multi-core</li>
+              <li>Advanced Scheduling</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <!-- CTA Section -->
+      <div class="cta-section">
+        <h2>Ready to Explore?</h2>
+        <p>
+          Start with our comprehensive guides, study the implementation details,
+          and build your understanding of modern OS architecture.
+        </p>
+        <a href="architecture/bootloader.html" class="cta-button"
+          >Begin Learning →</a
+        >
+      </div>
+    </div>
+
+    <footer>
+      <p><strong>AOS - Technical Documentation</strong></p>
+      <p>A modern 64-bit educational kernel | Open Source | April 2026</p>
+      <p style="margin-top: 1rem; opacity: 0.7">
+        Built with passion for OS education and development
+      </p>
+    </footer>
+  </body>
+</html>
