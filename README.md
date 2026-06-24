@@ -5,7 +5,14 @@
 
 ---
 
+## 🌐 Live Web Documentation
+The full architecture documentation, development guides, and subsystem deep-dives are rendered live at:
+👉 **[https://daedgoat17.github.io/AOS/](https://daedgoat17.github.io/AOS/)**
+
+---
+
 ## 🎯 Quick Start (Build & Run)
+
 ```bash
 ./run.sh --run        # Runs in BIOS (Legacy) mode
 ./run.sh --run --uefi # Runs in UEFI (Modern) mode
