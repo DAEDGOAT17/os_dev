@@ -1,4 +1,4 @@
-# Jarvis OS - Modern 64-bit Educational Kernel
+# AOS - Modern 64-bit Educational Kernel
 > A powerful x86_64 monolithic kernel built from scratch for learning OS internals and AI integration.
 
 **Status**: Active Development | **License**: Open Source | **Target**: Modern Laptops (x86_64) | **Language**: C (99%)
