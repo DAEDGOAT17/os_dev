@@ -113,6 +113,10 @@ make
 
 ---
 
+## 📸 Demo
+
+![Jarvis OS Demo](images/jarvis-os-image.jpg)
+
 ## 📚 Learning Focus
 
 This project covers:
