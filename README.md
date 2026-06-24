@@ -115,7 +115,7 @@ make
 
 ## 📸 Demo
 
-![Jarvis OS Demo](images/jarvis-os-image.jpg)
+![Jarvis OS Demo](images/jarvis-os-image.jpeg)
 
 ## 📚 Learning Focus
 
