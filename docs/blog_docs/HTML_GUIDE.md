@@ -441,5 +441,3 @@ Each HTML file is self-contained with:
 **Status**: Ready to Deploy  
 **Format**: HTML5 + CSS3  
 **Responsive**: Mobile, Tablet, Desktop
-
-Start with `index.html` and explore! 🚀
