@@ -1,4 +1,4 @@
-# Jarvis OS: Open Source Acknowledgements
+# AOS: Open Source Acknowledgements
 
 Jarvis OS is a custom 64-bit bare-metal operating system built entirely from scratch. However, to achieve complex routing and high-performance neural network inference without reinventing the wheel, we leverage several ultra-lightweight open-source projects designed specifically for embedded/bare-metal environments.
 
